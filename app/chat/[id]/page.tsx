@@ -5,22 +5,18 @@ import { ChatInput } from "@/components/chat/chat-input"
 import { useChatLite } from "@/hooks/use-chat-lite"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import ChatSidebar from "@/components/chat/sidebar"
+import { use } from "react"
 
-export default function Page() {
-  const {
-    messages,
-    input,
-    setInput,
-    append,
-    isLoading,
-    user,
-    dbLoading,
-    conversations,
-    activeId,
-    newConversation,
-    selectConversation,
-    deleteConversation,
-  } = useChatLite({ api: "/api/chat" })
+interface ChatPageProps {
+  params: Promise<{ id: string }>
+}
+
+export default function ChatPage({ params }: ChatPageProps) {
+  const { id } = use(params)
+  const { messages, input, setInput, append, isLoading, user, dbLoading } = useChatLite({
+    api: "/api/chat",
+    chatId: id,
+  })
 
   function send({
     model,
@@ -47,37 +43,34 @@ export default function Page() {
     setInput("")
   }
 
+  if (dbLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <SidebarProvider>
-      <ChatSidebar
-        conversations={conversations}
-        activeId={activeId}
-        onNewChat={newConversation}
-        onSelectChat={selectConversation}
-        onDeleteChat={deleteConversation}
-      />
+      <ChatSidebar />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
           <header className="sticky top-0 left-0 right-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
               <h1 className="text-lg font-semibold">SentientAI</h1>
-              {dbLoading && (
-                <div className="ml-auto">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                </div>
-              )}
             </div>
           </header>
 
           <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4">
-            {/* Scrollable messages */}
             <section className="flex-1 overflow-y-auto py-4">
-              <MessageList messages={messages as any} isLoading={isLoading} />
+              <MessageList messages={messages as any} />
             </section>
 
-            {/* Input stays at bottom */}
             <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-4">
               <ChatInput value={input} onChange={setInput} onSend={send} disabled={isLoading} />
             </div>

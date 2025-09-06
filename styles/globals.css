@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -120,7 +120,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    background: #ffffff; /* neutral background to remove the orange noise */
     @apply bg-background text-foreground;
   }
 }
