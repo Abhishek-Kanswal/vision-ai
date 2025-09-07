@@ -55,23 +55,25 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
       setConversations([initial])
       setActiveId(initial.id)
 
-      try {
-        setDbLoading(true)
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setUser(user)
+      if (supabase) {
+        try {
+          setDbLoading(true)
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+          setUser(user)
 
-        if (user) {
-          await loadConversations()
-          if (chatId) {
-            await loadSpecificChat(chatId)
+          if (user) {
+            await loadConversations()
+            if (chatId) {
+              await loadSpecificChat(chatId)
+            }
           }
+        } catch (error) {
+          console.log("Authentication not available, using local storage")
+        } finally {
+          setDbLoading(false)
         }
-      } catch (error) {
-        console.log("Authentication not available, using local storage")
-      } finally {
-        setDbLoading(false)
       }
     }
 
@@ -79,7 +81,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }, [chatId])
 
   const loadConversations = async () => {
-    if (!user) return
+    if (!user || !supabase) return
 
     const { data, error } = await supabase.from("chats").select("*").order("updated_at", { ascending: false })
 
@@ -100,14 +102,14 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }
 
   const loadSpecificChat = async (chatId: string) => {
-    if (!user) return
+    if (!user || !supabase) return
 
     await loadMessages(chatId)
     setActiveId(chatId)
   }
 
   const loadMessages = async (chatId: string) => {
-    if (!user) return
+    if (!user || !supabase) return
 
     const { data, error } = await supabase
       .from("messages")
@@ -133,7 +135,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }
 
   const saveMessage = async (chatId: string, message: ChatMessage) => {
-    if (!user) return
+    if (!user || !supabase) return
 
     const { error } = await supabase.from("messages").insert({
       chat_id: chatId,
@@ -148,7 +150,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }
 
   const updateChatTimestamp = async (chatId: string) => {
-    if (!user) return
+    if (!user || !supabase) return
 
     await supabase.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId)
   }
@@ -177,7 +179,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     async (message: ChatMessage, opts?: AppendOptions) => {
       if (!activeId) return
 
-      if (user) {
+      if (user && supabase) {
         await saveMessage(activeId, message)
         await updateChatTimestamp(activeId)
       }
@@ -211,7 +213,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             messages: [...c.messages, errorMessage],
           }))
 
-          if (user) {
+          if (user && supabase) {
             await saveMessage(activeId, errorMessage)
           }
 
@@ -228,7 +230,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             messages: [...c.messages, assistantMessage],
           }))
 
-          if (user) {
+          if (user && supabase) {
             await saveMessage(activeId, assistantMessage)
           }
 
@@ -264,7 +266,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           })
         }
 
-        if (user && acc && !assistantMessageSaved) {
+        if (user && supabase && acc && !assistantMessageSaved) {
           await saveMessage(activeId, { role: "assistant", content: acc })
           assistantMessageSaved = true
         }
@@ -277,7 +279,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             messages: [...c.messages, errorMessage],
           }))
 
-          if (user) {
+          if (user && supabase) {
             await saveMessage(activeId, errorMessage)
           }
         }
@@ -286,7 +288,7 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         abortRef.current = null
       }
     },
-    [api, activeId, messages, updateActive, user],
+    [api, activeId, messages, updateActive, user, supabase],
   )
 
   const stop = useCallback(() => {
@@ -296,8 +298,8 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }, [])
 
   const newConversation = useCallback(async () => {
-    if (!user) {
-      // For non-authenticated users, create local conversation
+    if (!user || !supabase) {
+      // For non-authenticated users or when Supabase is not available, create local conversation
       const conv = createConversation()
       setConversations((prev) => [conv, ...prev])
       setActiveId(conv.id)
@@ -329,17 +331,17 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   const selectConversation = useCallback(
     async (id: string) => {
       setActiveId(id)
-      if (user) {
+      if (user && supabase) {
         await loadMessages(id)
       }
     },
-    [user],
+    [user, supabase],
   )
 
   const renameConversation = useCallback(
     async (id: string, title: string) => {
-      if (!user) {
-        // For non-authenticated users, update locally
+      if (!user || !supabase) {
+        // For non-authenticated users or when Supabase is not available, update locally
         setConversations((prev) =>
           prev.map((c) => (c.id === id ? { ...c, title: title || c.title, updatedAt: Date.now() } : c)),
         )
@@ -363,8 +365,8 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      if (!user) {
-        // For non-authenticated users, delete locally
+      if (!user || !supabase) {
+        // For non-authenticated users or when Supabase is not available, delete locally
         setConversations((prev) => {
           const next = prev.filter((c) => c.id !== id)
           if (next.length === 0) {

@@ -14,6 +14,12 @@ export default function Page() {
 
   const handleOAuthLogin = async (provider: "google" | "twitter") => {
     const supabase = createClient()
+
+    if (!supabase) {
+      setError("Authentication is not configured. Please check your environment variables.")
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -81,7 +87,17 @@ export default function Page() {
                   Continue with X
                 </Button>
 
-                {error && <p className="text-sm text-red-500">{error}</p>}
+                {error && (
+                  <div className="rounded-md bg-red-50 p-3">
+                    <p className="text-sm text-red-600">{error}</p>
+                    {error.includes("environment variables") && (
+                      <p className="mt-1 text-xs text-red-500">
+                        Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment
+                        variables.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
