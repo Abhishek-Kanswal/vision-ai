@@ -38,6 +38,7 @@ export default function Page() {
     deleteConversation,
     renameConversation,
     reloadConversations,
+    stop,
   } = useChatLite({ api: "/api/chat" });
 
   function handleNewChat() {
