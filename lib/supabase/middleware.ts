@@ -33,9 +33,6 @@ export async function updateSession(request: NextRequest) {
       console.error("Middleware auth error:", error)
     }
 
-    // Optional: Add custom logic based on user authentication status
-    // For example, redirect unauthenticated users from protected routes
-
   } catch (error) {
     console.error("Middleware error:", error)
   }
