@@ -9,10 +9,10 @@ import {
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider
-      attribute="class"          // adds class="light" or "dark" on <html>
-      defaultTheme="light"       // 👈 force light by default
-      enableSystem={false}       // 👈 ignore system preference
-      disableTransitionOnChange  // optional: smoother switching
+      attribute="class"
+      defaultTheme="light"
+      enableSystem={false}
+      disableTransitionOnChange
       {...props}
     >
       {children}

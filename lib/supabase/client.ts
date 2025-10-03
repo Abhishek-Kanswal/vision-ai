@@ -1,12 +1,12 @@
+// lib/supabase/client.ts
 import { createBrowserClient } from "@supabase/ssr"
 
 export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    // Return null if Supabase is not configured
-    return null
+    throw new Error("Missing Supabase environment variables")
   }
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
