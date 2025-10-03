@@ -1,4 +1,3 @@
-// app/api/chat/route.ts
 import type { NextRequest } from "next/server"
 
 export async function POST(req: NextRequest) {
@@ -16,7 +15,7 @@ export async function POST(req: NextRequest) {
       return new Response("Error: Missing Fireworks API key", { status: 500 })
     }
 
-    // --- Helper: Stream Fireworks output ---
+    //Stream Fireworks output
     const streamFireworks = async (preparedMessages: any[]) => {
       const response = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
         method: "POST",
@@ -67,7 +66,6 @@ export async function POST(req: NextRequest) {
                   const content = parsed.choices?.[0]?.delta?.content
                   if (content) controller.enqueue(encoder.encode(content))
                 } catch {
-                  // ignore malformed chunks
                 }
               }
             }
@@ -80,7 +78,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // --- Skip ROMA if message too short ---
+    // Skip ROMA if message too short
     if (userGoal.trim().length < 6) {
       console.log("Skipping ROMA: message too short")
       const stream = await streamFireworks(messages)
@@ -92,7 +90,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // --- Step 1: Create ROMA project ---
+    // Create ROMA project
     const romaResponse = await fetch(
       "https://roma-app-latest.onrender.com/api/projects/configured",
       {
@@ -138,9 +136,9 @@ export async function POST(req: NextRequest) {
     }
     console.log("Created ROMA project:", projectId)
 
-    // --- Step 2: Poll ROMA project until completed or timeout ---
-    const maxWait = 10000 // 10 seconds
-    const pollInterval = 2000 // 2 seconds
+    //Poll ROMA project until completed or timeout
+    const maxWait = 10000
+    const pollInterval = 2000
     const start = Date.now()
 
     let projectStatus: any = null
@@ -155,7 +153,7 @@ export async function POST(req: NextRequest) {
       await new Promise((r) => setTimeout(r, pollInterval))
     }
 
-    // --- Step 3: Get final results (nodes) ---
+    //Get final results (nodes)
     const resultsRes = await fetch(
       `https://roma-app-latest.onrender.com/api/projects/${projectId}/load-results`
     )
@@ -166,7 +164,7 @@ export async function POST(req: NextRequest) {
 
     const romaSummary = JSON.stringify(resultsData, null, 2)
 
-    // --- Step 4: Forward to Fireworks with ROMA context ---
+    //Forward to Fireworks with ROMA context
     const preparedMessages = [
   {
     role: "system",

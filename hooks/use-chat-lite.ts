@@ -49,7 +49,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   const abortRef = useRef<AbortController | null>(null)
   const supabase = createClient()
 
-  // Helper functions for loading states
   const setLoading = useCallback((conversationId: string, loading: boolean) => {
     setLoadingStates(prev => ({
       ...prev,
@@ -61,13 +60,11 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     return loadingStates[conversationId] || false
   }, [loadingStates])
 
-  // Initialize auth and load conversations
   useEffect(() => {
     async function initialize() {
       try {
         setDbLoading(true)
 
-        // Get user session
         if (supabase) {
           const { data: { user: authUser }, error } = await supabase.auth.getUser()
           if (!error) {
@@ -82,13 +79,11 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             }
           } else {
             console.error("Error getting user:", error)
-            // Fallback to local storage
             const initial = createConversation()
             setConversations([initial])
             setActiveId(initial.id)
           }
         } else {
-          // local
           const initial = createConversation()
           setConversations([initial])
           setActiveId(initial.id)
@@ -110,7 +105,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     if (!supabase) return
 
     try {
-      // Load ALL chats with their messages in a single query
       const { data: chatsData, error: chatsError } = await supabase
         .from("chats")
         .select("*")
@@ -123,7 +117,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
       }
 
       if (chatsData && chatsData.length > 0) {
-        // Load ALL messages for ALL chats in a single query
         const { data: messagesData, error: messagesError } = await supabase
           .from("messages")
           .select("*")
@@ -135,7 +128,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           return
         }
 
-        // Group messages by chat_id
         const messagesByChatId = new Map()
         if (messagesData) {
           messagesData.forEach(message => {
@@ -146,7 +138,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           })
         }
 
-        // Create conversations with their messages
         const loadedConversations: Conversation[] = chatsData.map((chat) => {
           const chatMessages = messagesByChatId.get(chat.id) || []
 
@@ -170,16 +161,13 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
 
         setConversations(loadedConversations)
 
-        // Set active conversation
         if (loadedConversations.length > 0) {
           const activeConversationId = chatId || loadedConversations[0].id
           setActiveId(activeConversationId)
         } else {
-          // No conversations found, create one
           await newConversation()
         }
       } else {
-        // No conversations found, create one
         await newConversation()
       }
     } catch (error) {
@@ -191,7 +179,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     if (!user || !supabase) return
 
     try {
-      // Load specific chat with its messages
       const { data, error } = await supabase
         .from("chats")
         .select(`
@@ -230,7 +217,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         })) : [],
       }
 
-      // Update conversations list with the loaded chat
       setConversations(prev => {
         const filtered = prev.filter(conv => conv.id !== specificChatId)
         return [conversation, ...filtered]
@@ -302,14 +288,12 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     [activeId],
   )
 
-  // Update your useEffect to handle both empty and "AI is thinking..." messages
   useEffect(() => {
     const handleIncompleteResponses = () => {
       setConversations(prev =>
         prev.map(conv => ({
           ...conv,
           messages: conv.messages.map(msg => {
-            // If there's an incomplete assistant message (empty or loading text)
             if (msg.role === "assistant" &&
               (!msg.content ||
                 msg.content.trim() === "" ||
@@ -333,17 +317,14 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     async (message: ChatMessage, opts?: AppendOptions) => {
       if (!activeId) return;
 
-      // Set loading for this specific conversation
       setLoading(activeId, true);
 
-      // Add user message to local state immediately
       updateActive((c) => ({
         ...c,
         updatedAt: Date.now(),
         messages: [...c.messages, message],
       }));
 
-      // Save to database if authenticated
       if (user && supabase) {
         await saveMessage(activeId, message);
         await updateChatTimestamp(activeId);
@@ -382,12 +363,10 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           return;
         }
 
-        // Handle streaming response
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedContent = "";
 
-        // Create assistant message placeholder in UI only (not in DB yet)
         const loadingMessage = {
           role: "assistant" as const,
           content: "AI is thinking..."
@@ -404,7 +383,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
 
           accumulatedContent += decoder.decode(value, { stream: true });
 
-          // Update the assistant message with actual content
           updateActive((c) => {
             const updatedMessages = [...c.messages];
             const lastMessage = updatedMessages[updatedMessages.length - 1];
@@ -419,7 +397,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         }
 
         if (user && supabase && accumulatedContent) {
-          // Replace the loading message with actual content in UI
           updateActive((c) => {
             const updatedMessages = [...c.messages];
             updatedMessages[updatedMessages.length - 1] = {
@@ -429,7 +406,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             return { ...c, messages: updatedMessages };
           });
 
-          // Save the actual content to database
           await saveMessage(activeId, {
             role: "assistant",
             content: accumulatedContent
@@ -440,7 +416,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         if (err?.name !== "AbortError") {
           console.error("Error in append:", err);
 
-          // Replace the loading message with error message
           updateActive((c) => {
             const updatedMessages = [...c.messages];
             if (updatedMessages.length > 0) {
@@ -455,7 +430,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             return { ...c, messages: updatedMessages };
           });
 
-          // Save error message to database
           if (user && supabase) {
             await saveMessage(activeId, {
               role: "assistant",
@@ -463,7 +437,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             });
           }
         } else {
-          // This is a manual stop - show stopped message
           updateActive((c) => {
             const updatedMessages = [...c.messages];
             if (updatedMessages.length > 0) {
@@ -478,7 +451,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             return { ...c, messages: updatedMessages };
           });
 
-          // Save stopped message to database
           if (user && supabase) {
             await saveMessage(activeId, {
               role: "assistant",
@@ -534,7 +506,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
       }
     }
 
-    // Fallback to local conversation
     setConversations((prev) => [newConv, ...prev])
     setActiveId(newConv.id)
   }, [user, supabase])
@@ -565,8 +536,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           console.error("Error in renameConversation:", error)
         }
       }
-
-      // Update local state regardless of DB success
       setConversations((prev) =>
         prev.map((c) =>
           c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c
@@ -590,7 +559,6 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         }
       }
 
-      // Update local state
       setConversations((prev) => {
         const filtered = prev.filter((c) => c.id !== id)
 

@@ -1,4 +1,3 @@
-// app/auth/login/page.tsx
 "use client"
 
 import { createClient } from "@/lib/supabase/client"
@@ -42,7 +41,6 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-6">
       <div className="w-full max-w-md">
-        {/* Logo/Brand */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70">
             <div 

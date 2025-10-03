@@ -40,12 +40,10 @@ export default function Page() {
     reloadConversations,
   } = useChatLite({ api: "/api/chat" });
 
-  // Reset rename flag and create a new conversation
   function handleNewChat() {
     if (typeof newConversation === "function") newConversation();
   }
 
-  // Map UI model name to API model string
   function getModelString(name: string) {
     if (name === "Dobby-3.3-70B") {
       return "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
@@ -79,7 +77,6 @@ export default function Page() {
         deepSearch,
         attachmentsText,
       },
-      // No chat renaming logic here
     });
 
     setInput("");
@@ -128,7 +125,6 @@ export default function Page() {
             <div className="flex-1 flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  {/* Thin black border like your screenshot + no focus ring */}
                   <button className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium bg-background hover:bg-muted cursor-pointer focus:outline-none focus:ring-0 focus-visible:ring-0">
                     {selectedAIModel}
                     <ChevronDown className="h-4 w-4 opacity-70" />
@@ -185,7 +181,6 @@ export default function Page() {
           <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 relative">
             {messages.length > 0 ? (
               <>
-                {/* Messages */}
                 <section className="flex-1 overflow-y-auto py-4">
                   <MessageList
                     messages={messages as any}
@@ -193,7 +188,6 @@ export default function Page() {
                   />
                 </section>
 
-                {/* Sticky Input */}
                 <div className="sticky bottom-0 bg-background py-4 border-t">
                   <ChatInput
                     value={input}
@@ -207,9 +201,7 @@ export default function Page() {
                 </div>
               </>
             ) : (
-              // Empty State - Different layout for mobile vs desktop
               <>
-                {/* Desktop Layout (your original code) */}
                 <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-6 -translate-y-8">
                   <h1 className="text-4xl font-bold text-center text-neutral-700">
                     Good to see you here, try out Dobby AI
@@ -228,16 +220,13 @@ export default function Page() {
                   </div>
                 </div>
 
-                {/* Mobile Layout - Input at bottom */}
                 <div className="md:hidden flex flex-col min-h-full">
-                  {/* Welcome message at top */}
                   <div className="flex-1 flex items-center justify-center px-4">
                     <h1 className="text-2xl font-bold text-center text-neutral-700">
                       Good to see you here, try out Dobby AI
                     </h1>
                   </div>
                   
-                  {/* Input fixed at bottom */}
                   <div className="sticky bottom-0 bg-background py-4 border-t">
                     <ChatInput
                       value={input}

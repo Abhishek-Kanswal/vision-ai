@@ -69,7 +69,6 @@ export default function ChatSidebar({
   const supabase = createClient();
   const sidebar = useSidebar();
 
-  // Initialize auth
   useEffect(() => {
     async function initializeAuth() {
       try {
@@ -91,12 +90,10 @@ export default function ChatSidebar({
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  // Track sidebar expanded state
   useEffect(() => {
     if (setIsExpanded) setIsExpanded(state === "expanded");
   }, [state, setIsExpanded]);
 
-  // Filter to show only chats with messages (using local messages array only)
   const chatsWithMessages = conversations.filter(chat =>
     chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0
   );
@@ -155,7 +152,6 @@ export default function ChatSidebar({
         console.error("Error deleting chat:", err);
       }
     } else {
-      // For unauthenticated users, rely on the parent hook to handle deletion
       if (onDeleteChat) {
         onDeleteChat(chatId);
       }
@@ -265,7 +261,7 @@ export default function ChatSidebar({
                   <SidebarMenuButton
                     onClick={() => {
                       handleSelectChat(chat.id);
-                      if (window.innerWidth < 768) { // You can use 640 for sm breakpoint or 768 for md
+                      if (window.innerWidth < 768) {
                         sidebar.toggleSidebar();
                       }
                     }}

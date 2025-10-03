@@ -3,7 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Scrollbar for code blocks */
 .scrollbar-thin::-webkit-scrollbar {
   height: 8px;
   width: 8px;
@@ -15,11 +14,11 @@
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background: #a1a1aa; /* default */
+  background: #a1a1aa;
 }
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #52525b; /* dark theme */
+  background: #52525b;
 }
 
 
@@ -140,7 +139,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    background: #ffffff; /* neutral background to remove the orange noise */
+    background: #ffffff;
     @apply bg-background text-foreground;
   }
 }

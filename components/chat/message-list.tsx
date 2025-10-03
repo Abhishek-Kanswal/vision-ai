@@ -30,7 +30,6 @@ export function MessageList({
   useEffect(() => setMounted(true), [])
   useEffect(() => setIsGenerating(messages.length % 2 !== 0), [messages.length])
 
-  // Auto scroll
   useEffect(() => {
     if (!messages.length && !isLoading) return
     lastMessageRef.current?.scrollIntoView({
@@ -128,7 +127,6 @@ export function MessageList({
       ],
     }
 
-    // Use JavaScript patterns as fallback
     const langPatterns = patterns[language.toLowerCase()] || patterns.javascript
 
     let highlighted = code
@@ -145,7 +143,6 @@ export function MessageList({
       }
     })
 
-    // Sort by position and apply replacements
     replacements.sort((a, b) => b.start - a.start)
     replacements.forEach(({ start, end, html }) => {
       highlighted = highlighted.slice(0, start) + html + highlighted.slice(end)
