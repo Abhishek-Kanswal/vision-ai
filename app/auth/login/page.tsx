@@ -1,6 +1,6 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
+import { supabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const supabase = createClient()
+      const supabase = supabaseBrowser()
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,

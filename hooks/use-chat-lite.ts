@@ -1,146 +1,217 @@
-"use client"
+// hooks/use-chat-lite.ts
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { supabaseBrowser } from "@/lib/supabase/client"; // ensure this exports a function that returns a browser Supabase client
 
-export type ChatMessage = {
-  id?: string
-  role: "user" | "assistant" | "system"
-  content: string
-  image?: {
-    url: string
-    name: string
-  }
+// --- types from your original hook ---
+export interface AgentResponse {
+  name: string;
+  content: string;
+  sources?: string[];
+  rawData: string;
+  error?: string;
+  status: "success" | "error";
+  metadata?: {
+    responseTime?: number;
+    dataPoints?: number;
+    currency?: string;
+    sourceCount?: number;
+  };
+}
+
+export interface ChatMessage {
+  id?: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  image?: { url: string; name: string };
+  agents?: AgentResponse[];
 }
 
 export type Conversation = {
-  id: string
-  title: string
-  updatedAt: number
-  messages: ChatMessage[]
-}
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: ChatMessage[];
+};
 
 type UseChatLiteOptions = {
-  api: string
-  chatId?: string
-}
+  api: string;
+  chatId?: string | null;
+};
 
 type AppendOptions = {
-  data?: any
-}
+  data?: any;
+};
 
 function createConversation(title = "New chat"): Conversation {
   return {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? (crypto as any).randomUUID()
+        : String(Date.now()),
     title,
     updatedAt: Date.now(),
     messages: [],
-  }
+  };
 }
 
 export function useChatLite({ api, chatId }: UseChatLiteOptions) {
-  const [user, setUser] = useState<User | null>(null)
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [input, setInput] = useState("")
-  const [dbLoading, setDbLoading] = useState(true)
-  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
-  const abortRef = useRef<AbortController | null>(null)
-  const supabase = createClient()
+  const [user, setUser] = useState<User | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [dbLoading, setDbLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Hold Supabase client in ref to avoid calling createClient at module load
+  const supabaseRef = useRef<any | null>(null);
 
   const setLoading = useCallback((conversationId: string, loading: boolean) => {
-    setLoadingStates(prev => ({
+    setLoadingStates((prev) => ({
       ...prev,
-      [conversationId]: loading
-    }))
-  }, [])
+      [conversationId]: loading,
+    }));
+  }, []);
 
-  const getLoading = useCallback((conversationId: string) => {
-    return loadingStates[conversationId] || false
-  }, [loadingStates])
+  const getLoading = useCallback(
+    (conversationId: string) => {
+      return loadingStates[conversationId] || false;
+    },
+    [loadingStates]
+  );
 
+  // initialize supabase client and user
   useEffect(() => {
-    async function initialize() {
+    let mounted = true;
+    const init = async () => {
       try {
-        setDbLoading(true)
+        // Create browser client from your lib (must return a browser client)
+        try {
+          supabaseRef.current = supabaseBrowser();
+        } catch (err) {
+          // fallback: if the lib exports an async factory
+          if (typeof (createClientFromLib as any) === "function") {
+            const maybePromise = (createClientFromLib as any)();
+            if (maybePromise && typeof maybePromise.then === "function") {
+              supabaseRef.current = await maybePromise;
+            }
+          }
+        }
 
-        if (supabase) {
-          const { data: { user: authUser }, error } = await supabase.auth.getUser()
+        if (!mounted) return;
+
+        if (supabaseRef.current) {
+          const { data, error } = await supabaseRef.current.auth.getUser();
           if (!error) {
-            setUser(authUser)
+            const authUser = data?.user ?? null;
+            setUser(authUser);
 
             if (authUser) {
-              await loadConversations(authUser.id)
+              await loadConversations(authUser.id);
             } else {
-              const initial = createConversation()
-              setConversations([initial])
-              setActiveId(initial.id)
+              const initial = createConversation();
+              setConversations([initial]);
+              setActiveId(initial.id);
             }
+
+            // subscribe to auth changes
+            const { data: sub } = supabaseRef.current.auth.onAuthStateChange(
+              (_event: any, session: any) => {
+                setUser(session?.user ?? null);
+              }
+            );
+
+            // cleanup subscription on unmount
+            return () => {
+              try {
+                sub?.subscription?.unsubscribe?.();
+              } catch {
+                try {
+                  sub?.unsubscribe?.();
+                } catch {
+                  /* ignore */
+                }
+              }
+            };
           } else {
-            console.error("Error getting user:", error)
-            const initial = createConversation()
-            setConversations([initial])
-            setActiveId(initial.id)
+            console.error("Error getting user:", error);
+            const initial = createConversation();
+            setConversations([initial]);
+            setActiveId(initial.id);
           }
         } else {
-          const initial = createConversation()
-          setConversations([initial])
-          setActiveId(initial.id)
+          // if supabase not available, initialize local state
+          const initial = createConversation();
+          setConversations([initial]);
+          setActiveId(initial.id);
         }
       } catch (error) {
-        console.error("Initialization error:", error)
-        const initial = createConversation()
-        setConversations([initial])
-        setActiveId(initial.id)
+        console.error("Initialization error:", error);
+        const initial = createConversation();
+        setConversations([initial]);
+        setActiveId(initial.id);
       } finally {
-        setDbLoading(false)
+        if (mounted) setDbLoading(false);
       }
-    }
+    };
 
-    initialize()
-  }, [chatId])
+    init();
 
+    return () => {
+      mounted = false;
+      // abort any ongoing requests
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]); // keep chatId as dep to reload if provided
+
+  // load conversations helper (uses supabaseRef.current)
   const loadConversations = async (userId: string) => {
-    if (!supabase) return
+    const supabase = supabaseRef.current;
+    if (!supabase) return;
 
     try {
       const { data: chatsData, error: chatsError } = await supabase
         .from("chats")
         .select("*")
         .eq("user_id", userId)
-        .order("updated_at", { ascending: false })
+        .order("updated_at", { ascending: false });
 
       if (chatsError) {
-        console.error("Error loading conversations:", chatsError)
-        return
+        console.error("Error loading conversations:", chatsError);
+        return;
       }
 
       if (chatsData && chatsData.length > 0) {
         const { data: messagesData, error: messagesError } = await supabase
           .from("messages")
           .select("*")
-          .in("chat_id", chatsData.map(chat => chat.id))
-          .order("created_at", { ascending: true })
+          .in("chat_id", chatsData.map((chat: any) => chat.id))
+          .order("created_at", { ascending: true });
 
         if (messagesError) {
-          console.error("Error loading messages:", messagesError)
-          return
+          console.error("Error loading messages:", messagesError);
+          return;
         }
 
-        const messagesByChatId = new Map()
+        const messagesByChatId = new Map<string, any[]>();
         if (messagesData) {
-          messagesData.forEach(message => {
+          messagesData.forEach((message: any) => {
             if (!messagesByChatId.has(message.chat_id)) {
-              messagesByChatId.set(message.chat_id, [])
+              messagesByChatId.set(message.chat_id, []);
             }
-            messagesByChatId.get(message.chat_id).push(message)
-          })
+            messagesByChatId.get(message.chat_id).push(message);
+          });
         }
 
-        const loadedConversations: Conversation[] = chatsData.map((chat) => {
-          const chatMessages = messagesByChatId.get(chat.id) || []
-
+        const loadedConversations: Conversation[] = chatsData.map((chat: any) => {
+          const chatMessages = messagesByChatId.get(chat.id) || [];
           return {
             id: chat.id,
             title: chat.title,
@@ -156,27 +227,28 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
                 },
               }),
             })),
-          }
-        })
+          };
+        });
 
-        setConversations(loadedConversations)
+        setConversations(loadedConversations);
 
         if (loadedConversations.length > 0) {
-          const activeConversationId = chatId || loadedConversations[0].id
-          setActiveId(activeConversationId)
+          const activeConversationId = chatId || loadedConversations[0].id;
+          setActiveId(activeConversationId);
         } else {
-          await newConversation()
+          await newConversation();
         }
       } else {
-        await newConversation()
+        await newConversation();
       }
     } catch (error) {
-      console.error("Error in loadConversations:", error)
+      console.error("Error in loadConversations:", error);
     }
-  }
+  };
 
   const loadSpecificChat = async (specificChatId: string) => {
-    if (!user || !supabase) return
+    const supabase = supabaseRef.current;
+    if (!user || !supabase) return;
 
     try {
       const { data, error } = await supabase
@@ -193,43 +265,46 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         `)
         .eq("id", specificChatId)
         .eq("user_id", user.id)
-        .single()
+        .single();
 
       if (error || !data) {
-        console.error("Chat not found or access denied")
-        return
+        console.error("Chat not found or access denied");
+        return;
       }
 
       const conversation: Conversation = {
         id: data.id,
         title: data.title,
         updatedAt: new Date(data.updated_at).getTime(),
-        messages: data.messages ? data.messages.map((msg: any) => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-          ...(msg.image_url && {
-            image: {
-              url: msg.image_url,
-              name: "image",
-            },
-          }),
-        })) : [],
-      }
+        messages: data.messages
+          ? data.messages.map((msg: any) => ({
+              id: msg.id,
+              role: msg.role as "user" | "assistant",
+              content: msg.content,
+              ...(msg.image_url && {
+                image: {
+                  url: msg.image_url,
+                  name: "image",
+                },
+              }),
+            }))
+          : [],
+      };
 
-      setConversations(prev => {
-        const filtered = prev.filter(conv => conv.id !== specificChatId)
-        return [conversation, ...filtered]
-      })
+      setConversations((prev) => {
+        const filtered = prev.filter((conv) => conv.id !== specificChatId);
+        return [conversation, ...filtered];
+      });
 
-      setActiveId(specificChatId)
+      setActiveId(specificChatId);
     } catch (error) {
-      console.error("Error loading specific chat:", error)
+      console.error("Error loading specific chat:", error);
     }
-  }
+  };
 
   const saveMessage = async (chatId: string, message: ChatMessage) => {
-    if (!user || !supabase) return null
+    const supabase = supabaseRef.current;
+    if (!user || !supabase) return null;
 
     try {
       const { data, error } = await supabase
@@ -241,71 +316,71 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           image_url: message.image?.url || null,
         })
         .select()
-        .single()
+        .single();
 
       if (error) {
-        console.error("Error saving message:", error)
-        return null
+        console.error("Error saving message:", error);
+        return null;
       }
 
-      return data
+      return data;
     } catch (error) {
-      console.error("Error in saveMessage:", error)
-      return null
+      console.error("Error in saveMessage:", error);
+      return null;
     }
-  }
+  };
 
   const updateChatTimestamp = async (chatId: string) => {
-    if (!user || !supabase) return
+    const supabase = supabaseRef.current;
+    if (!user || !supabase) return;
 
     try {
-      await supabase
-        .from("chats")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", chatId)
+      await supabase.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
     } catch (error) {
-      console.error("Error updating chat timestamp:", error)
+      console.error("Error updating chat timestamp:", error);
     }
-  }
+  };
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeId) || null,
-    [conversations, activeId],
-  )
+    [conversations, activeId]
+  );
 
-  const messages = activeConversation?.messages ?? []
+  const messages = activeConversation?.messages ?? [];
 
   const updateActive = useCallback(
     (updater: (c: Conversation) => Conversation) => {
       setConversations((prev) => {
-        const idx = prev.findIndex((c) => c.id === activeId)
-        if (idx === -1) return prev
-        const clone = [...prev]
-        clone[idx] = updater({ ...clone[idx] })
-        return clone
-      })
+        const idx = prev.findIndex((c) => c.id === activeId);
+        if (idx === -1) return prev;
+        const clone = [...prev];
+        clone[idx] = updater({ ...clone[idx] });
+        return clone;
+      });
     },
-    [activeId],
-  )
+    [activeId]
+  );
 
   useEffect(() => {
     const handleIncompleteResponses = () => {
-      setConversations(prev =>
-        prev.map(conv => ({
+      setConversations((prev) =>
+        prev.map((conv) => ({
           ...conv,
-          messages: conv.messages.map(msg => {
-            if (msg.role === "assistant" &&
+          messages: conv.messages.map((msg) => {
+            if (
+              msg.role === "assistant" &&
               (!msg.content ||
                 msg.content.trim() === "" ||
                 msg.content === "AI is thinking..." ||
-                msg.content === "Thinking...")) {
+                msg.content === "Thinking...")
+            ) {
               return {
                 ...msg,
-                content: "Sorry, got disrupted by loading. Please try your message again."
+                content: "Sorry, got disrupted by loading. Please try your message again.",
               };
             }
             return msg;
-          })
+          }),
         }))
       );
     };
@@ -325,7 +400,8 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         messages: [...c.messages, message],
       }));
 
-      if (user && supabase) {
+      // save to DB if available
+      if (user && supabaseRef.current) {
         await saveMessage(activeId, message);
         await updateChatTimestamp(activeId);
       }
@@ -346,124 +422,52 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        if (!res.body) {
-          const text = await res.text().catch(() => "");
-          const assistantMessage = { role: "assistant" as const, content: text };
+        const responseData = await res.json();
 
-          updateActive((c) => ({
-            ...c,
-            messages: [...c.messages, assistantMessage],
-          }));
-
-          if (user && supabase) {
-            await saveMessage(activeId, assistantMessage);
-          }
-
-          setLoading(activeId, false);
-          return;
+        if (responseData.error) {
+          throw new Error(responseData.error);
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedContent = "";
-
-        const loadingMessage = {
-          role: "assistant" as const,
-          content: "AI is thinking..."
+        const assistantMessage: ChatMessage = {
+          role: "assistant",
+          content: responseData.message,
+          agents: responseData.agents || [],
         };
 
         updateActive((c) => ({
           ...c,
-          messages: [...c.messages, loadingMessage],
+          messages: [...c.messages, assistantMessage],
         }));
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          accumulatedContent += decoder.decode(value, { stream: true });
-
-          updateActive((c) => {
-            const updatedMessages = [...c.messages];
-            const lastMessage = updatedMessages[updatedMessages.length - 1];
-            if (lastMessage && lastMessage.role === "assistant") {
-              updatedMessages[updatedMessages.length - 1] = {
-                ...lastMessage,
-                content: accumulatedContent || "Thinking...",
-              };
-            }
-            return { ...c, messages: updatedMessages };
-          });
+        if (user && supabaseRef.current) {
+          await saveMessage(activeId, assistantMessage);
         }
-
-        if (user && supabase && accumulatedContent) {
-          updateActive((c) => {
-            const updatedMessages = [...c.messages];
-            updatedMessages[updatedMessages.length - 1] = {
-              role: "assistant",
-              content: accumulatedContent
-            };
-            return { ...c, messages: updatedMessages };
-          });
-
-          await saveMessage(activeId, {
-            role: "assistant",
-            content: accumulatedContent
-          });
-        }
-
       } catch (err: any) {
         if (err?.name !== "AbortError") {
           console.error("Error in append:", err);
 
-          updateActive((c) => {
-            const updatedMessages = [...c.messages];
-            if (updatedMessages.length > 0) {
-              const lastMessage = updatedMessages[updatedMessages.length - 1];
-              if (lastMessage.role === "assistant") {
-                updatedMessages[updatedMessages.length - 1] = {
-                  ...lastMessage,
-                  content: "Sorry, got disrupted by loading. Please try your message again."
-                };
-              }
-            }
-            return { ...c, messages: updatedMessages };
-          });
+          const errorMessage: ChatMessage = {
+            role: "assistant",
+            content: "Sorry, there was an error processing your request. Please try again.",
+          };
 
-          if (user && supabase) {
-            await saveMessage(activeId, {
-              role: "assistant",
-              content: "Sorry, got disrupted by loading. Please try your message again."
-            });
+          updateActive((c) => ({
+            ...c,
+            messages: [...c.messages, errorMessage],
+          }));
+
+          if (user && supabaseRef.current) {
+            await saveMessage(activeId, errorMessage);
           }
         } else {
-          updateActive((c) => {
-            const updatedMessages = [...c.messages];
-            if (updatedMessages.length > 0) {
-              const lastMessage = updatedMessages[updatedMessages.length - 1];
-              if (lastMessage.role === "assistant") {
-                updatedMessages[updatedMessages.length - 1] = {
-                  ...lastMessage,
-                  content: "Response generation stopped by user."
-                };
-              }
-            }
-            return { ...c, messages: updatedMessages };
-          });
-
-          if (user && supabase) {
-            await saveMessage(activeId, {
-              role: "assistant",
-              content: "Response generation stopped by user."
-            });
-          }
+          console.log("Request was aborted by user");
         }
       } finally {
         setLoading(activeId, false);
         abortRef.current = null;
       }
     },
-    [api, activeId, messages, updateActive, user, supabase, setLoading],
+    [api, activeId, messages, updateActive, user, setLoading]
   );
 
   const stop = useCallback(() => {
@@ -477,18 +481,18 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   }, [activeId, setLoading]);
 
   const newConversation = useCallback(async () => {
-    const newConv = createConversation()
+    const newConv = createConversation();
 
-    if (user && supabase) {
+    if (user && supabaseRef.current) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseRef.current
           .from("chats")
           .insert({
             user_id: user.id,
             title: newConv.title,
           })
           .select()
-          .single()
+          .single();
 
         if (!error && data) {
           const dbConversation: Conversation = {
@@ -496,89 +500,82 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
             title: data.title,
             updatedAt: new Date(data.created_at).getTime(),
             messages: [],
-          }
-          setConversations((prev) => [dbConversation, ...prev])
-          setActiveId(dbConversation.id)
-          return
+          };
+          setConversations((prev) => [dbConversation, ...prev]);
+          setActiveId(dbConversation.id);
+          return;
         }
       } catch (error) {
-        console.error("Error creating conversation in DB:", error)
+        console.error("Error creating conversation in DB:", error);
       }
     }
 
-    setConversations((prev) => [newConv, ...prev])
-    setActiveId(newConv.id)
-  }, [user, supabase])
+    setConversations((prev) => [newConv, ...prev]);
+    setActiveId(newConv.id);
+  }, [user]);
 
-  const selectConversation = useCallback(
-    async (id: string) => {
-      setActiveId(id)
-    },
-    []
-  )
+  const selectConversation = useCallback(async (id: string) => {
+    setActiveId(id);
+  }, []);
 
   const renameConversation = useCallback(
     async (id: string, title: string) => {
-      const newTitle = title.trim() || "New Chat"
+      const newTitle = title.trim() || "New Chat";
 
-      if (user && supabase) {
+      if (user && supabaseRef.current) {
         try {
-          const { error } = await supabase
-            .from("chats")
-            .update({ title: newTitle })
-            .eq("id", id)
+          const { error } = await supabaseRef.current.from("chats").update({ title: newTitle }).eq("id", id);
 
           if (error) {
-            console.error("Error renaming conversation:", error)
-            return
+            console.error("Error renaming conversation:", error);
+            return;
           }
         } catch (error) {
-          console.error("Error in renameConversation:", error)
+          console.error("Error in renameConversation:", error);
         }
       }
+
       setConversations((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c
-        ),
-      )
+        prev.map((c) => (c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c))
+      );
     },
-    [user, supabase]
-  )
+    [user]
+  );
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      if (user && supabase) {
+      if (user && supabaseRef.current) {
         try {
-          const { error } = await supabase.from("chats").delete().eq("id", id)
+          const { error } = await supabaseRef.current.from("chats").delete().eq("id", id);
           if (error) {
-            console.error("Error deleting conversation:", error)
-            return
+            console.error("Error deleting conversation:", error);
+            return;
           }
         } catch (error) {
-          console.error("Error in deleteConversation:", error)
+          console.error("Error in deleteConversation:", error);
         }
       }
 
       setConversations((prev) => {
-        const filtered = prev.filter((c) => c.id !== id)
+        const filtered = prev.filter((c) => c.id !== id);
 
         if (filtered.length === 0) {
-          const newConv = createConversation()
-          setActiveId(newConv.id)
-          return [newConv]
+          const newConv = createConversation();
+          setActiveId(newConv.id);
+          return [newConv];
         }
 
         if (activeId === id) {
-          setActiveId(filtered[0].id)
+          setActiveId(filtered[0].id);
         }
 
-        return filtered
-      })
+        return filtered;
+      });
     },
-    [activeId, user, supabase],
-  )
+    [activeId, user]
+  );
 
-  const isLoading = getLoading(activeId || '')
+  const isLoading = getLoading(activeId || "");
 
   return {
     // chat data
@@ -598,5 +595,5 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
     deleteConversation,
     user,
     dbLoading,
-  }
+  };
 }

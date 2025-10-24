@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import type React from "react";
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseBrowser } from '@/lib/supabase/client';
 import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
@@ -15,25 +16,20 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  SquarePen,
+  Search,
+  MoreHorizontal,
+  Trash2,
+  LogOut,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  SquarePen,
-  Search,
-  ImageIcon,
-  Settings,
-  LogOut,
-  MoreHorizontal,
-  Trash2,
-  UserPlus,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
 
 interface Chat {
   id: string;
@@ -51,6 +47,7 @@ interface ChatSidebarProps {
   onDeleteChat?: (id: string) => void;
   setInput?: (input: string) => void;
   setIsExpanded?: (expanded: boolean) => void;
+  isSidebarExpanded?: boolean;
 }
 
 export default function ChatSidebar({
@@ -61,339 +58,311 @@ export default function ChatSidebar({
   onSelectChat,
   onDeleteChat,
   setIsExpanded,
+  isSidebarExpanded,
 }: ChatSidebarProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { state } = useSidebar();
+  const [authLoading, setAuthLoading] = useState(true);
+  const [chatLoading, setChatLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
-  const sidebar = useSidebar();
+  const { toggleSidebar } = useSidebar();
 
+const supabase = supabaseBrowser();
+
+  // --- Auth state ---
   useEffect(() => {
-    async function initializeAuth() {
+    let mounted = true;
+
+    const initAuth = async () => {
       try {
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        if (!error) setUser(authUser);
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+
+        if (mounted) setUser(authUser ?? null);
       } catch (err) {
-        console.error("Error initializing auth:", err);
+        console.error("Auth error:", err);
       } finally {
-        setLoading(false);
+        if (mounted) setAuthLoading(false);
       }
-    }
+    };
 
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    initAuth();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
-  useEffect(() => {
-    if (setIsExpanded) setIsExpanded(state === "expanded");
-  }, [state, setIsExpanded]);
-
-  const chatsWithMessages = conversations.filter(chat =>
-    chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0
+  const chatsWithMessages = useMemo(
+    () =>
+      conversations
+        .filter((c) => Array.isArray(c.messages) && c.messages.length > 0)
+        .sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at).getTime();
+          const dateB = new Date(b.updated_at || b.created_at).getTime();
+          return dateB - dateA;
+        }),
+    [conversations]
   );
 
-  // Sign out
-  async function handleSignOut() {
+  const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
       router.push("/");
     } catch (err) {
-      console.error("Error signing out:", err);
+      console.error("Sign-out error:", err);
     }
-  }
+  };
 
-  // Create new chat
-  async function handleNewChat() {
+  const handleNewChat = async () => {
     if (setInput) setInput("");
-
-    if (onNewChat) {
-      onNewChat();
-      return;
-    }
+    if (onNewChat) return onNewChat();
 
     if (user) {
+      setChatLoading(true);
       try {
         const { data, error } = await supabase
           .from("chats")
-          .insert({ user_id: user.id, title: "New Chat" })
+          .insert({
+            user_id: user.id,
+            title: "New Chat",
+            updated_at: new Date().toISOString(),
+          })
           .select()
           .single();
 
         if (!error && data) router.push(`/chat/${data.id}`);
       } catch (err) {
-        console.error("Error creating new chat:", err);
+        console.error(err);
+      } finally {
+        setChatLoading(false);
       }
-    } else {
-      router.push("/chat");
-    }
-  }
+    } else router.push("/chat");
+  };
 
-  // Delete chat
-  async function deleteChat(chatId: string, e: React.MouseEvent) {
+  const deleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (onDeleteChat) return onDeleteChat(chatId);
 
-    if (onDeleteChat) {
-      onDeleteChat(chatId);
-      return;
+    try {
+      if (user) {
+        await supabase.from("chats").delete().eq("id", chatId);
+        if (activeId === chatId) router.push("/chat");
+      } else if (activeId === chatId) router.push("/chat");
+    } catch (err) {
+      console.error(err);
     }
+  };
 
-    if (user) {
-      try {
-        const { error } = await supabase.from("chats").delete().eq("id", chatId);
-        if (!error && activeId === chatId) router.push("/chat");
-      } catch (err) {
-        console.error("Error deleting chat:", err);
-      }
-    } else {
-      if (onDeleteChat) {
-        onDeleteChat(chatId);
-      }
-      if (activeId === chatId) router.push("/chat");
-    }
-  }
-
-  // Select chat
-  function handleSelectChat(chatId: string) {
+  const handleSelectChat = (chatId: string) => {
     if (onSelectChat) onSelectChat(chatId);
     else router.push(`/chat/${chatId}`);
-  }
+  };
 
-  if (loading) {
-    return (
-      <Sidebar collapsible="icon" className="overflow-x-hidden">
-        <SidebarContent className="overflow-x-hidden">
-          <div className="flex items-center justify-center p-4">
-            <div className="text-muted-foreground text-sm">Loading...</div>
-          </div>
-        </SidebarContent>
-      </Sidebar>
-    );
-  }
+  useEffect(() => {
+    if (!isSidebarExpanded && typeof setIsExpanded === "function") {
+      const t = setTimeout(() => setIsExpanded(true), 300);
+      return () => clearTimeout(t);
+    }
+  }, [isSidebarExpanded, setIsExpanded]);
 
   return (
     <Sidebar
-      collapsible="icon"
-      className="overflow-x-hidden border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      collapsible="offcanvas"
+      className="overflow-x-hidden bg-sidebar backdrop-blur supports-[backdrop-filter]:bg-sidebar transition-all duration-200"
     >
       {/* Header */}
-      <SidebarHeader className="sticky top-0 z-10 px-2 py-2 border-b bg-background/80 backdrop-blur">
-        <div className={`flex items-center w-full ${state === "expanded" ? "gap-2" : "justify-center"}`}>
+      <SidebarHeader className="sticky top-0 z-10 backdrop-blur mt-2">
+        <div className="flex items-center gap-3 px-3">
           <div
-            className={`rounded-lg ring-1 ring-primary/20 flex items-center justify-center transition-all duration-200
-              ${state === "expanded" ? "h-10 w-10 ml-2" : "h-9 w-9"}`}
-            style={{ backgroundImage: 'url("/sentient.avif")', backgroundSize: "cover", backgroundPosition: "center" }}
+            className="h-12 w-12 rounded-xl bg-cover bg-center shadow-sm"
+            style={{ backgroundImage: 'url("/sentient.avif")' }}
           />
-          {state === "expanded" && (
-            <span className="text-base font-semibold text-foreground/90 tracking-tight select-none">
-              SentientAI
-            </span>
-          )}
+          <span className="text-lg font-semibold text-primary tracking-tight select-none">
+            VisionAI
+          </span>
         </div>
       </SidebarHeader>
 
-      {/* Navigation */}
+      {/* Content */}
       <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="px-2 py-3">
+        {/* Main menu */}
+        <div className="px-2 py-3 space-y-2">
           <SidebarMenu>
-            <SidebarMenuItem className="min-w-0">
-              <SidebarMenuButton
-                onClick={() => {
-                  handleNewChat();
-                  if (window.innerWidth < 768) {
-                    sidebar.toggleSidebar();
-                  }
-                }}
-                className={`min-w-0 rounded-lg transition hover:bg-muted/60
-    ${state === "expanded" ? "px-3 py-2 justify-start" : "p-2 justify-center"}`}
-                tooltip="New chat"
-              >
-                <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                {state === "expanded" && <span className="truncate text-sm">New Chat</span>}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-
-            <SidebarMenuItem className="min-w-0">
-              <SidebarMenuButton
-                className={`min-w-0 rounded-lg transition hover:bg-muted/60
-                  ${state === "expanded" ? "px-3 py-2 justify-start" : "p-2 justify-center"}`}
-                tooltip="Search chats"
-              >
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                {state === "expanded" && <span className="truncate text-sm">Search chats</span>}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-
-            <SidebarMenuItem className="min-w-0">
-              <SidebarMenuButton
-                className={`min-w-0 rounded-lg transition hover:bg-muted/60
-                  ${state === "expanded" ? "px-3 py-2 justify-start" : "p-2 justify-center"}`}
-                tooltip="Library"
-              >
-                <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                {state === "expanded" && <span className="truncate text-sm">Library</span>}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {[
+              { icon: SquarePen, label: "New Chat", onClick: handleNewChat },
+              { icon: Search, label: "Search Chats" },
+            ].map(({ icon: Icon, label, onClick }) => (
+              <SidebarMenuItem key={label}>
+                <SidebarMenuButton
+                  onClick={() => {
+                    onClick?.();
+                    if (window.innerWidth < 768) toggleSidebar();
+                  }}
+                  className="rounded-xl hover:bg-accent/50 transition px-3 py-3 flex items-center gap-3 justify-start mb-2"
+                >
+                  <Icon className="h-8 w-8 shrink-0 text-muted-foreground" />
+                  <span className="text-[16px] font-medium truncate">{label}</span>
+                </SidebarMenuButton>
+                <SidebarSeparator />
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </div>
 
-        <SidebarSeparator className="mx-3" />
-
         {/* Chat list */}
         <div className="p-2">
-          {state === "expanded" && (
-            <div className="px-2 py-1 mb-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                {user ? "Recent Chats" : "Current Session"}
-              </p>
-            </div>
+          <p className="px-3 py-1 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {user ? "Recent Chats" : "Current Session"}
+          </p>
+
+          {chatLoading && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">Loading chats...</div>
           )}
+
           <SidebarMenu>
-            {chatsWithMessages.length > 0
-              ? chatsWithMessages.map((chat) => (
-                <SidebarMenuItem key={chat.id}>
-                  <SidebarMenuButton
-                    onClick={() => {
-                      handleSelectChat(chat.id);
-                      if (window.innerWidth < 768) {
-                        sidebar.toggleSidebar();
-                      }
-                    }}
-                    isActive={activeId === chat.id}
-                    tooltip={chat.title}
-                    className="group"
-                  >
-                    {state === "expanded" ? (
-                      <>
-                        <span className="flex-1 truncate text-left text-sm">{chat.title}</span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => deleteChat(chat.id, e)} className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    ) : (
-                      <MoreHorizontal className="h-4 w-4" />
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))
-              : state === "expanded" && (
-                <div className="px-2 py-3 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {user ? "No chats with messages" : "Start a new chat to begin"}
-                  </p>
-                </div>
-              )}
+            {chatsWithMessages.map((chat) => (
+              <SidebarMenuItem key={chat.id}>
+                <SidebarMenuButton
+                  onClick={() => {
+                    handleSelectChat(chat.id);
+                    if (window.innerWidth < 768) toggleSidebar();
+                  }}
+                  isActive={activeId === chat.id}
+                  className={`group rounded-lg px-3 py-2.5 flex items-center justify-between transition 
+                    ${activeId === chat.id ? "bg-[var(--muted)]" : "hover:bg-accent/50"}`}
+                >
+                  <span className="flex-1 truncate text-sm">{chat.title}</span>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded cursor-pointer"
+                      >
+                        <MoreHorizontal className="h-5 w-5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-[var(--card)] border rounded-xl" align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => deleteChat(chat.id, e)}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-5 w-5 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            {chatsWithMessages.length === 0 && !chatLoading && (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                {user ? "No chats yet" : "Start a new chat"}
+              </div>
+            )}
           </SidebarMenu>
         </div>
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="sticky bottom-0 border-t bg-background/95 px-3 py-2 backdrop-blur-lg supports-[backdrop-filter]:bg-background/90">
-        <SidebarMenu>
-          <SidebarMenuItem className="min-w-0">
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center min-w-0 w-full rounded-lg transition-all duration-200 hover:bg-accent/50 focus:outline-none focus:ring-0
-                ${state === "expanded"
-                        ? "justify-start px-3 py-2 gap-3"
-                        : "justify-center p-2"
-                      }`}
-                  >
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarImage
-                        src={user.user_metadata?.avatar_url}
-                        alt={user.user_metadata?.full_name || "User"}
-                        className="object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                      <AvatarFallback className="text-sm font-medium bg-muted">
-                        {user.user_metadata?.full_name
-                          ?.charAt(0)
-                          .toUpperCase() ||
-                          user.email?.charAt(0).toUpperCase() ||
-                          "U"}
-                      </AvatarFallback>
-                    </Avatar>
+      <SidebarFooter className="sticky bottom-0 px-3 py-2 backdrop-blur">
+        {!user && (
+          <div className="w-full bg-background text-foreground rounded-xl border border-border p-4 space-y-3 shadow-sm">
+            <div>
+              <p className="text-base font-semibold">Login for good experience</p>
+              <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                Sign up to gain access to higher limits for messages, save chats,
+                multiple models, and more.
+              </p>
+            </div>
+            <Link
+              href="/auth/login"
+              className="w-full block bg-[var(--primary)] text-primary-foreground font-medium text-sm py-2 rounded-md transition hover:bg-primary/90 active:bg-primary/80 cursor-pointer text-center"
+              prefetch
+            >
+              Sign in
+            </Link>
+          </div>
+        )}
 
-                    {state === "expanded" && (
-                      <div className="flex items-center justify-between min-w-0 flex-1 gap-3">
-                        <div className="flex flex-col items-start min-w-0 flex-1">
-                          <span className="text-sm font-medium text-foreground truncate w-full">
-                            {user.user_metadata?.full_name || "User"}
-                          </span>
-                        </div>
-                        <MoreHorizontal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="top"
-                  align="start"
-                  className="w-56 rounded-xl shadow-lg border bg-popover/95 backdrop-blur-sm"
-                >
-                  <div className="px-3 py-2 border-b">
-                    <p className="text-sm font-medium text-foreground">
+        {/* User Menu */}
+        <SidebarMenu className="mt-2">
+          <SidebarMenuItem>
+            {user ? (
+              <div className="flex items-center justify-between w-full rounded-lg px-3 py-3 bg-popover hover:bg-accent/50 transition">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={user.user_metadata?.avatar_url || "/default-avatar.png"}
+                    alt="Avatar"
+                    className="h-9 w-9 rounded-xl object-cover"
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-medium text-foreground truncate">
                       {user.user_metadata?.full_name || "User"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
                       {user.email}
-                    </p>
+                    </span>
                   </div>
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="px-3 py-2 cursor-pointer hover:bg-destructive/10 hover:text-destructive rounded-lg m-1 text-destructive focus:outline-none focus:ring-0"
-                  >
-                    <LogOut className="mr-3 h-4 w-4" />
-                    <span className="text-sm">Sign out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <SidebarMenuButton
-                onClick={() => router.push("/auth/login")}
-                className={`min-w-0 w-full rounded-lg transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus:outline-none focus:ring-0
-            ${state === "expanded"
-                    ? "justify-start px-3 py-2 gap-3"
-                    : "justify-center p-2"
-                  }`}
-                tooltip="Sign in to save chats"
-              >
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                  <UserPlus className="h-4 w-4" />
                 </div>
-                {state === "expanded" && (
-                  <div className="flex items-center justify-between min-w-0 flex-1 gap-3">
-                    <div className="flex flex-col items-start min-w-0 flex-1">
-                      <span className="text-sm font-medium">Sign In</span>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-2 rounded-md hover:bg-[var(--accent)] transition-colors focus:outline-none focus:ring-0 cursor-pointer"
+                      title="More options"
+                    >
+                      <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent
+                    side="top"
+                    align="end"
+                    className="w-56 rounded-xl shadow-lg border bg-[var(--popover)]"
+                  >
+                    <div className="px-3 py-2 border-b">
+                      <p className="text-sm font-medium text-foreground">
+                        {user.user_metadata?.full_name || "User"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user.email}
+                      </p>
                     </div>
-                    <MoreHorizontal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+                    <DropdownMenuItem
+                      onClick={handleSignOut}
+                      className="px-3 py-2 cursor-pointer hover:bg-[var(--destructive)]/10 hover:text-destructive rounded-lg m-1 text-destructive focus:outline-none focus:ring-0"
+                    >
+                      <LogOut className="mr-3 h-4 w-4" />
+                      <span className="text-sm">Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between w-full rounded-lg px-3 py-3 hover:bg-accent/50 transition">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
+                    <img
+                      src="/guest-icon.png"
+                      alt="Guest"
+                      className="h-6 w-6 rounded-lg object-cover"
+                    />
                   </div>
-                )}
-              </SidebarMenuButton>
+                  <span className="text-sm font-medium text-foreground">
+                    Guest Mode
+                  </span>
+                </div>
+              </div>
             )}
           </SidebarMenuItem>
         </SidebarMenu>
