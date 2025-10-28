@@ -56,7 +56,10 @@ export function ChatInput({
 
   return (
     <div
-      className="w-full rounded-[28px] border border-border bg-background/96 px-4 md:px-6 pt-4 pb-3 shadow-[0_10px_30px_rgba(0,0,0,0.05),_0_2px_6px_rgba(0,0,0,0.04)]"
+      className="w-full rounded-[28px] border border-border bg-background/96 px-4 md:px-6 pt-4 pb-3
+                 shadow-[0_10px_30px_rgba(0,0,0,0.05),_0_2px_6px_rgba(0,0,0,0.04)]
+                 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/20
+                 transition-all"
       role="form"
       aria-label="Chat input"
       aria-busy={isLoading || undefined}
@@ -70,10 +73,11 @@ export function ChatInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask 800+ AIs anything"
+            placeholder="Ask anything to VisionAI"
             rows={1}
             disabled={isLoading}
-            className="w-full resize-none border-0 bg-transparent outline-none focus:ring-0 text-base leading-6 text-foreground placeholder:text-muted-foreground pt-[0.2rem]"
+            className="w-full resize-none border-0 bg-transparent outline-none text-base leading-6 text-foreground
+                       placeholder:text-muted-foreground pt-[0.2rem] transition-all"
           />
         </div>
 
@@ -96,9 +100,8 @@ export function ChatInput({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.9 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
-                className={`flex items-center justify-center h-12 w-12 rounded-full bg-primary hover:brightness-95 shadow-sm text-primary-foreground transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/70 ${
-                  disabled ? "cursor-not-allowed opacity-70" : ""
-                }`}
+                className={`flex items-center justify-center h-12 w-12 rounded-full bg-primary hover:brightness-95 shadow-sm text-primary-foreground transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/70 ${disabled ? "cursor-not-allowed opacity-70" : ""
+                  }`}
                 aria-label="Send"
               >
                 <ArrowUp className="h-5 w-5" />

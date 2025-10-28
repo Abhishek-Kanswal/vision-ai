@@ -1,90 +1,79 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useTheme } from "next-themes";
-import { Copy, Check, RefreshCcw, MoreVertical } from "lucide-react";
-import type { ChatMessage } from "@/types/agent";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { CodeBlock } from "@geist-ui/core";
+import { useEffect, useRef, useState, useCallback } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { useTheme } from "next-themes"
+import { Copy, Check, RefreshCcw, ThumbsUp, ThumbsDown } from "lucide-react"
+import type { ChatMessage } from "@/types/agent"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { CodeBlock } from "@/components/ui/code-block"
 
 export function MessageList({
   messages,
   isLoading,
   onRegenerate,
 }: {
-  messages: ChatMessage[];
-  isLoading?: boolean;
-  onRegenerate?: () => void;
+  messages: ChatMessage[]
+  isLoading?: boolean
+  onRegenerate?: () => void
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const lastMessageRef = useRef<HTMLDivElement | null>(null);
-  const { theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const lastMessageRef = useRef<HTMLDivElement | null>(null)
+  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [copiedText, setCopiedText] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [feedback, setFeedback] = useState<Record<number, "like" | "dislike" | null>>({})
 
-  useEffect(() => setMounted(true), []);
-  useEffect(() => setIsGenerating(messages.length % 2 !== 0), [messages.length]);
-
-  useEffect(() => {
-    if (!isAtBottom) return;
-    lastMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [messages, isLoading, isGenerating, isAtBottom]);
+  useEffect(() => setMounted(true), [])
+  useEffect(() => setIsGenerating(messages.length % 2 !== 0), [messages.length])
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (!isAtBottom) return
+    lastMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [messages, isLoading, isGenerating, isAtBottom])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
     const handleScroll = () => {
-      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-      setIsAtBottom(nearBottom);
-    };
-    container.addEventListener("scroll", handleScroll);
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, []);
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+      setIsAtBottom(nearBottom)
+    }
+    container.addEventListener("scroll", handleScroll)
+    return () => container.removeEventListener("scroll", handleScroll)
+  }, [])
 
   const handleCopy = useCallback(async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 1000);
-  }, []);
+    await navigator.clipboard.writeText(text)
+    setCopiedText(text)
+    setTimeout(() => setCopiedText(null), 1000)
+  }, [])
 
-  if (!mounted) return null;
+  const handleFeedback = useCallback((messageIndex: number, type: "like" | "dislike") => {
+    setFeedback((prev) => ({
+      ...prev,
+      [messageIndex]: prev[messageIndex] === type ? null : type,
+    }))
+  }, [])
+
+  if (!mounted) return null
 
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-col h-full overflow-y-auto overflow-x-hidden scroll-smooth"
-    >
+    <div ref={containerRef} className="flex flex-col h-full overflow-y-auto overflow-x-hidden scroll-smooth">
       <div className="flex flex-col gap-4 pb-32 px-2 md:px-4">
         {messages.map((m, i) => {
-          const isUser = m.role === "user";
-          const isLast = i === messages.length - 1;
+          const isUser = m.role === "user"
+          const isLast = i === messages.length - 1
 
           return (
             <div
               key={i}
               ref={isLast && !isLoading ? lastMessageRef : null}
-              className={`flex items-start gap-2 md:gap-3 w-full ${
-                isUser ? "justify-end" : "justify-start"
-              }`}
-              onMouseEnter={() => !isUser && setHoveredMessageId(i)}
-              onMouseLeave={() => setHoveredMessageId(null)}
+              className={`flex items-start gap-2 md:gap-3 w-full ${isUser ? "justify-end" : "justify-start"}`}
             >
               {!isUser && (
                 <div className="hidden md:flex mt-1 h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
@@ -100,6 +89,7 @@ export function MessageList({
                       : "max-w-full md:max-w-[90%] bg-transparent text-foreground px-1 md:px-3 py-2"
                   } rounded-2xl text-sm leading-relaxed break-words overflow-hidden`}
                 >
+                  {/* Image */}
                   {m.image && (
                     <img
                       src={m.image.url || "/placeholder.svg"}
@@ -108,60 +98,42 @@ export function MessageList({
                     />
                   )}
 
+                  {/* Text / Markdown */}
                   {!isUser ? (
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
                         code({ inline, className, children }) {
-                          const codeText = String(children).replace(/\n$/, "");
-                          const language =
-                            className?.replace("language-", "") || "plaintext";
+                          const codeText = String(children).replace(/\n$/, "")
+                          const language = className?.replace("language-", "") || "plaintext"
 
                           if (inline) {
                             return (
                               <code className="px-1.5 py-0.5 rounded font-mono text-xs bg-muted text-foreground">
                                 {children}
                               </code>
-                            );
+                            )
                           }
 
-                          // CodeBlock
                           return (
-                            <div className="relative my-3 group">
-                              <CodeBlock
-                                aria-label="Code snippet"
-                                filename={`code.${language}`}
-                                language={language}
-                              >
-                                {codeText}
-                              </CodeBlock>
-
-                              <button
-                                onClick={() => handleCopy(codeText)}
-                                className="absolute top-2 right-2 p-1.5 rounded bg-background/80 hover:bg-background border border-border opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label="Copy code"
-                              >
-                                {copiedText === codeText ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <Copy className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          );
+                            <CodeBlock
+                              code={codeText}
+                              language={language}
+                              copied={copiedText === codeText}
+                              onCopy={() => handleCopy(codeText)}
+                            />
+                          )
                         },
                       }}
                     >
                       {m.content}
                     </ReactMarkdown>
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                      {m.content}
-                    </p>
+                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{m.content}</p>
                   )}
                 </div>
 
-                {!isUser && hoveredMessageId === i && (
+                {!isUser && (
                   <div className="flex items-center gap-1 px-1 md:px-3">
                     <TooltipProvider>
                       <Tooltip>
@@ -172,11 +144,7 @@ export function MessageList({
                             onClick={() => handleCopy(m.content)}
                             className="h-8 w-8 p-0 hover:bg-muted"
                           >
-                            {copiedText === m.content ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
+                            {copiedText === m.content ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -205,30 +173,50 @@ export function MessageList({
                       </TooltipProvider>
                     )}
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleCopy(m.content)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy message
-                        </DropdownMenuItem>
-                        {onRegenerate && isLast && (
-                          <DropdownMenuItem onClick={onRegenerate}>
-                            <RefreshCcw className="h-4 w-4 mr-2" />
-                            Regenerate response
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFeedback(i, "like")}
+                            className={`h-8 w-8 p-0 hover:bg-muted ${
+                              feedback[i] === "like" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                            }`}
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Like this response</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFeedback(i, "dislike")}
+                            className={`h-8 w-8 p-0 hover:bg-muted ${
+                              feedback[i] === "dislike" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                            }`}
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Dislike this response</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 )}
               </div>
             </div>
-          );
+          )
         })}
 
         {/* Typing indicator */}
@@ -251,5 +239,5 @@ export function MessageList({
         )}
       </div>
     </div>
-  );
+  )
 }

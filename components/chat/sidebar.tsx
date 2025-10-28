@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type React from "react";
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { User } from "@supabase/supabase-js";
@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   Trash2,
   LogOut,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -30,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 
 interface Chat {
   id: string;
@@ -63,10 +65,35 @@ export default function ChatSidebar({
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const router = useRouter();
   const { toggleSidebar } = useSidebar();
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-const supabase = supabaseBrowser();
+  const supabase = supabaseBrowser();
+  const avatarUrl = useMemo(() => {
+    if (avatarError) {
+      return "/default-avatar.png";
+    }
+
+    const rawUrl =
+      user?.user_metadata?.avatar_url ||
+      user?.user_metadata?.picture ||
+      "/default-avatar.png";
+
+    if (rawUrl?.includes("googleusercontent.com")) {
+      return rawUrl;
+    }
+
+    if (rawUrl?.includes("supabase")) {
+      return rawUrl;
+    }
+
+    return rawUrl;
+  }, [user, avatarError]);
 
   // --- Auth state ---
   useEffect(() => {
@@ -110,6 +137,24 @@ const supabase = supabaseBrowser();
         }),
     [conversations]
   );
+
+  const filteredChats = useMemo(() => {
+    if (!searchQuery.trim()) return chatsWithMessages;
+
+    const query = searchQuery.toLowerCase();
+    return chatsWithMessages.filter((chat) => {
+      if (chat.title.toLowerCase().includes(query)) return true;
+
+      if (chat.messages && Array.isArray(chat.messages)) {
+        return chat.messages.some((msg) => {
+          const content = msg.content || msg.text || "";
+          return content.toLowerCase().includes(query);
+        });
+      }
+
+      return false;
+    });
+  }, [chatsWithMessages, searchQuery]);
 
   const handleSignOut = async () => {
     try {
@@ -166,12 +211,34 @@ const supabase = supabaseBrowser();
     else router.push(`/chat/${chatId}`);
   };
 
+  const handleSearchToggle = () => {
+    setIsSearching(!isSearching);
+    if (isSearching) {
+      setSearchQuery("");
+    }
+  };
+
   useEffect(() => {
     if (!isSidebarExpanded && typeof setIsExpanded === "function") {
       const t = setTimeout(() => setIsExpanded(true), 300);
       return () => clearTimeout(t);
     }
   }, [isSidebarExpanded, setIsExpanded]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearching(false);
+        setSearchQuery("");
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <Sidebar
@@ -194,33 +261,78 @@ const supabase = supabaseBrowser();
       {/* Content */}
       <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Main menu */}
+        {/* Main menu */}
         <div className="px-2 py-3 space-y-2">
           <SidebarMenu>
-            {[
-              { icon: SquarePen, label: "New Chat", onClick: handleNewChat },
-              { icon: Search, label: "Search Chats" },
-            ].map(({ icon: Icon, label, onClick }) => (
-              <SidebarMenuItem key={label}>
-                <SidebarMenuButton
-                  onClick={() => {
-                    onClick?.();
-                    if (window.innerWidth < 768) toggleSidebar();
-                  }}
-                  className="rounded-xl hover:bg-accent/50 transition px-3 py-3 flex items-center gap-3 justify-start mb-2"
-                >
-                  <Icon className="h-8 w-8 shrink-0 text-muted-foreground" />
-                  <span className="text-[16px] font-medium truncate">{label}</span>
-                </SidebarMenuButton>
-                <SidebarSeparator />
-              </SidebarMenuItem>
-            ))}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => {
+                  handleNewChat();
+                  if (window.innerWidth < 768) toggleSidebar();
+                }}
+                className="rounded-xl hover:bg-accent/50 transition px-3 py-3 flex items-center gap-3 justify-start mb-2"
+              >
+                <SquarePen className="h-8 w-8 shrink-0 text-muted-foreground" />
+                <span className="text-[16px] font-medium truncate">New Chat</span>
+              </SidebarMenuButton>
+              <SidebarSeparator />
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <div ref={containerRef} className="relative w-full">
+                {isSearching ? (
+                  <>
+                  <SidebarMenuButton
+                    className="rounded-xl px-3 py-3 flex items-center gap-3 justify-start transition"
+                  >
+                    <Search className="h-8 w-8 text-muted-foreground shrink-0" />
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Search chats..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent text-[16px] font-medium w-full outline-none border-none placeholder:text-muted-foreground/70"
+                    />
+
+                    {/* Clear (also closes if empty) */}
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setIsSearching(false);
+                      }}
+                      className="p-1 hover:bg-accent rounded"
+                    >
+                      <X className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  </SidebarMenuButton>
+                  <SidebarSeparator/>
+                  </>
+                ) : (
+                  <>
+                  <SidebarMenuButton
+                    onClick={() => setIsSearching(true)}
+                    className="rounded-xl hover:bg-accent/50 px-3 py-3 flex items-center gap-3 justify-start transition"
+                  >
+                    <Search className="h-8 w-8 shrink-0 text-muted-foreground" />
+                    <span className="text-[16px] font-medium truncate">Search Chats</span>
+                  </SidebarMenuButton>
+                  <SidebarSeparator/>
+                  </>
+                )}
+              </div>
+            </SidebarMenuItem>
           </SidebarMenu>
         </div>
 
         {/* Chat list */}
         <div className="p-2">
           <p className="px-3 py-1 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            {user ? "Recent Chats" : "Current Session"}
+            {searchQuery
+              ? `Search Results (${filteredChats.length})`
+              : user
+                ? "Recent Chats"
+                : "Current Session"}
           </p>
 
           {chatLoading && (
@@ -228,16 +340,23 @@ const supabase = supabaseBrowser();
           )}
 
           <SidebarMenu>
-            {chatsWithMessages.map((chat) => (
-              <SidebarMenuItem key={chat.id}>
+
+            {filteredChats.map((chat) => (
+              <SidebarMenuItem
+                key={chat.id}
+                onMouseEnter={() => setHoveredChatId(chat.id)}
+                onMouseLeave={() => setHoveredChatId(null)}
+              >
                 <SidebarMenuButton
                   onClick={() => {
                     handleSelectChat(chat.id);
                     if (window.innerWidth < 768) toggleSidebar();
                   }}
                   isActive={activeId === chat.id}
-                  className={`group rounded-lg px-3 py-2.5 flex items-center justify-between transition 
-                    ${activeId === chat.id ? "bg-[var(--muted)]" : "hover:bg-accent/50"}`}
+                  className={`rounded-lg px-3 py-2.5 flex items-center justify-between transition
+        ${activeId === chat.id ? "bg-[var(--muted)]" : "hover:bg-[var(--card)]"} 
+        ${hoveredChatId === chat.id ? "bg-[var(--muted)]/90" : ""}
+        `}
                 >
                   <span className="flex-1 truncate text-sm">{chat.title}</span>
 
@@ -245,12 +364,16 @@ const supabase = supabaseBrowser();
                     <DropdownMenuTrigger asChild>
                       <button
                         onClick={(e) => e.stopPropagation()}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded cursor-pointer"
+                        className={`transition-opacity p-1 hover:bg-[var(--hover)] rounded cursor-pointer
+              ${hoveredChatId === chat.id ? "opacity-100" : "opacity-0"}`}
                       >
                         <MoreHorizontal className="h-5 w-5" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-[var(--card)] border rounded-xl" align="end">
+                    <DropdownMenuContent
+                      className="bg-[var(--card)] border rounded-xl"
+                      align="end"
+                    >
                       <DropdownMenuItem
                         onClick={(e) => deleteChat(chat.id, e)}
                         className="text-destructive"
@@ -263,11 +386,6 @@ const supabase = supabaseBrowser();
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-            {chatsWithMessages.length === 0 && !chatLoading && (
-              <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                {user ? "No chats yet" : "Start a new chat"}
-              </div>
-            )}
           </SidebarMenu>
         </div>
       </SidebarContent>
@@ -299,14 +417,31 @@ const supabase = supabaseBrowser();
             {user ? (
               <div className="flex items-center justify-between w-full rounded-lg px-3 py-3 bg-popover hover:bg-accent/50 transition">
                 <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={user.user_metadata?.avatar_url || "/default-avatar.png"}
-                    alt="Avatar"
-                    className="h-9 w-9 rounded-xl object-cover"
-                  />
+
+                  {/* Avatar or Fallback Letter Icon */}
+                  {!avatarError ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar"
+                      className="h-9 w-9 rounded-xl object-cover"
+                      onError={() => setAvatarError(true)}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-9 w-9 rounded-xl bg-[#4285F4] flex items-center justify-center">
+                      <span className="text-white text-sm font-semibold">
+                        {(user.user_metadata?.full_name ||
+                          user.user_metadata?.name ||
+                          user.email ||
+                          "U")[0].toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* User Text */}
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium text-foreground truncate">
-                      {user.user_metadata?.full_name || "User"}
+                      {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
                     </span>
                     <span className="text-xs text-muted-foreground truncate">
                       {user.email}
@@ -314,6 +449,7 @@ const supabase = supabaseBrowser();
                   </div>
                 </div>
 
+                {/* Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -331,7 +467,7 @@ const supabase = supabaseBrowser();
                   >
                     <div className="px-3 py-2 border-b">
                       <p className="text-sm font-medium text-foreground">
-                        {user.user_metadata?.full_name || "User"}
+                        {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {user.email}
@@ -353,14 +489,12 @@ const supabase = supabaseBrowser();
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
                     <img
-                      src="/guest-icon.png"
+                      src="/guest-icon.jpg"
                       alt="Guest"
-                      className="h-6 w-6 rounded-lg object-cover"
+                      className="h-8 w-8 rounded-xl object-cover"
                     />
                   </div>
-                  <span className="text-sm font-medium text-foreground">
-                    Guest Mode
-                  </span>
+                  <span className="text-sm font-medium text-foreground">Guest Mode</span>
                 </div>
               </div>
             )}

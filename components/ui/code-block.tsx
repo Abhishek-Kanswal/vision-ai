@@ -1,226 +1,62 @@
-"use client"
+"use client";
 
-import { Copy, Check } from "lucide-react"
-import { useState, useCallback } from "react"
+import { useState, useCallback } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { Copy, Check } from "lucide-react";
 
 interface CodeBlockProps {
-  code: string
-  language: string
-  filename?: string
+  code: string;
+  language: string;
+  filename?: string;
+  onCopy?: () => void;
+  copied?: boolean;
 }
 
-export function CodeBlock({ code, language, filename }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false)
+export function CodeBlock({ code, language, filename, copied, onCopy }: CodeBlockProps) {
+  const [internalCopied, setInternalCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1000)
-  }, [code])
-
-  // Simple syntax highlighting with regex patterns
-  const highlightCode = (code: string, lang: string) => {
-    // Keywords for different languages
-    const keywords: Record<string, string[]> = {
-      javascript: [
-        "const",
-        "let",
-        "var",
-        "function",
-        "return",
-        "if",
-        "else",
-        "for",
-        "while",
-        "import",
-        "export",
-        "async",
-        "await",
-        "class",
-        "extends",
-        "new",
-        "this",
-        "super",
-        "try",
-        "catch",
-        "throw",
-      ],
-      typescript: [
-        "const",
-        "let",
-        "var",
-        "function",
-        "return",
-        "if",
-        "else",
-        "for",
-        "while",
-        "import",
-        "export",
-        "async",
-        "await",
-        "class",
-        "extends",
-        "new",
-        "this",
-        "super",
-        "try",
-        "catch",
-        "throw",
-        "interface",
-        "type",
-        "enum",
-        "namespace",
-        "public",
-        "private",
-        "protected",
-      ],
-      jsx: [
-        "const",
-        "let",
-        "var",
-        "function",
-        "return",
-        "if",
-        "else",
-        "for",
-        "while",
-        "import",
-        "export",
-        "async",
-        "await",
-        "class",
-        "extends",
-        "new",
-        "this",
-        "super",
-        "try",
-        "catch",
-        "throw",
-      ],
-      tsx: [
-        "const",
-        "let",
-        "var",
-        "function",
-        "return",
-        "if",
-        "else",
-        "for",
-        "while",
-        "import",
-        "export",
-        "async",
-        "await",
-        "class",
-        "extends",
-        "new",
-        "this",
-        "super",
-        "try",
-        "catch",
-        "throw",
-        "interface",
-        "type",
-        "enum",
-      ],
-      python: [
-        "def",
-        "class",
-        "return",
-        "if",
-        "else",
-        "elif",
-        "for",
-        "while",
-        "import",
-        "from",
-        "as",
-        "try",
-        "except",
-        "finally",
-        "with",
-        "lambda",
-        "yield",
-        "async",
-        "await",
-      ],
-      sql: [
-        "SELECT",
-        "FROM",
-        "WHERE",
-        "INSERT",
-        "UPDATE",
-        "DELETE",
-        "CREATE",
-        "DROP",
-        "ALTER",
-        "JOIN",
-        "LEFT",
-        "RIGHT",
-        "INNER",
-        "OUTER",
-        "ON",
-        "GROUP",
-        "BY",
-        "ORDER",
-        "HAVING",
-      ],
-    }
-
-    const keywordList = keywords[lang] || []
-    let highlighted = code
-
-    // Highlight keywords
-    keywordList.forEach((keyword) => {
-      const regex = new RegExp(`\\b${keyword}\\b`, "g")
-      highlighted = highlighted.replace(regex, `<span class="text-blue-400">${keyword}</span>`)
-    })
-
-    // Highlight strings
-    highlighted = highlighted.replace(/"([^"]*)"/g, '<span class="text-green-400">"$1"</span>')
-    highlighted = highlighted.replace(/'([^']*)'/g, "<span class=\"text-green-400\">'$1'</span>")
-    highlighted = highlighted.replace(/`([^`]*)`/g, '<span class="text-green-400">`$1`</span>')
-
-    // Highlight comments
-    highlighted = highlighted.replace(/\/\/(.*)$/gm, '<span class="text-gray-500">//$1</span>')
-    highlighted = highlighted.replace(/\/\*([\s\S]*?)\*\//g, '<span class="text-gray-500">/*$1*/</span>')
-
-    // Highlight numbers
-    highlighted = highlighted.replace(/\b(\d+)\b/g, '<span class="text-orange-400">$1</span>')
-
-    return highlighted
-  }
+    await navigator.clipboard.writeText(code);
+    setInternalCopied(true);
+    onCopy?.();
+    setTimeout(() => setInternalCopied(false), 1000);
+  }, [code, onCopy]);
 
   return (
-    <div className="relative my-3 group rounded-lg overflow-hidden bg-black border border-gray-700">
-      {/* Header with filename */}
+    <div className="relative my-3 rounded-lg overflow-hidden bg-[#282C34] border border-gray-700">
+      {/* Filename header */}
       {filename && (
-        <div className="bg-gray-900 px-4 py-2 border-b border-gray-700 flex items-center justify-between">
+        <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between">
           <span className="text-xs font-mono text-gray-400">{filename}</span>
           <span className="text-xs text-gray-500">{language}</span>
         </div>
       )}
 
-      {/* Code container */}
-      <div className="overflow-x-auto">
-        <pre className="p-4 font-mono text-sm leading-relaxed text-gray-100">
-          <code
-            dangerouslySetInnerHTML={{
-              __html: highlightCode(code, language),
-            }}
-          />
-        </pre>
-      </div>
+      {/* Syntax Highlighted Code */}
+      <SyntaxHighlighter
+        language={language.toLowerCase()}
+        style={oneDark}
+        wrapLongLines
+        className="m-0 p-4 text-sm font-mono overflow-x-auto"
+        customStyle={{ background: "transparent" }}
+      >
+        {code}
+      </SyntaxHighlighter>
+
 
       {/* Copy button */}
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 p-2 rounded bg-gray-800 hover:bg-gray-700 border border-gray-600 transition-colors"
+        className="absolute top-2 right-2 p-2 rounded bg-[var(--card)] hover:bg-gray-700 border border-gray-600 transition-colors"
         aria-label="Copy code"
       >
-        {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4 text-gray-300" />}
+        {copied || internalCopied ? (
+          <Check className="h-4 w-4 text-green-400" />
+        ) : (
+          <Copy className="h-4 w-4 text-gray-300" />
+        )}
       </button>
     </div>
-  )
+  );
 }

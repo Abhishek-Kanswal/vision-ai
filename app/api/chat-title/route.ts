@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_URL = "https://api.fireworks.ai/inference/v1/chat/completions";
+const API_URL = "https://api.fireworks.ai/inference/v1/completions";
 const MODEL = "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
 
 export async function POST(req: NextRequest) {
@@ -18,31 +18,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
-    const truncatedMessage = userMessage.length > 500 
-      ? userMessage.substring(0, 500) + "..." 
-      : userMessage;
+    const truncatedMessage =
+      userMessage.length > 500 ? userMessage.substring(0, 500) + "..." : userMessage;
+
+    const prompt = `
+Generate a short, catchy chat title (2-5 words) based on this user message:
+"${truncatedMessage}"
+Do NOT reply to the user. ONLY return the title, no punctuation, no quotes, no explanation.
+    `;
 
     const payload = {
       model: MODEL,
-      max_tokens: 25,
+      prompt,
+      max_tokens: 20,
       temperature: 0.6,
-      messages: [
-        {
-          role: "system",
-          content: "You are an AI that generates short, catchy chat titles (2-5 words) based on the user's first message. Respond only with the title, no punctuation, quotes, or explanations.",
-        },
-        {
-          role: "user",
-          content: truncatedMessage,
-        },
-      ],
     };
 
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
@@ -55,11 +51,10 @@ export async function POST(req: NextRequest) {
 
     const data = await response.json();
 
-    let title = data?.choices?.[0]?.message?.content?.trim() ||
-                data?.choices?.[0]?.text?.trim();
+    let title = data?.choices?.[0]?.text?.trim();
 
     if (title) {
-      title = title.replace(/^["']|["']$/g, '').trim();
+      title = title.replace(/^["']|["']$/g, "").trim();
       if (title.length > 30) title = title.substring(0, 30).trim() + "...";
     }
 
