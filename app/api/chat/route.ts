@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { ulid } from "ulid";
+import { createClient } from '@supabase/supabase-js';
 
 export interface AgentResponse {
   name: string;
@@ -28,6 +29,11 @@ export interface ROMAResponse {
   };
 }
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 function withCors(response: Response) {
   response.headers.set("Access-Control-Allow-Origin", "*");
   response.headers.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -37,6 +43,45 @@ function withCors(response: Response) {
 
 export async function OPTIONS() {
   return withCors(new NextResponse(null, { status: 200 }));
+}
+
+async function validateApiKey(authHeader: string | null): Promise<{ isValid: boolean; keyData?: any }> {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('❌ No or invalid Authorization header');
+    return { isValid: false };
+  }
+
+  const apiKey = authHeader.replace('Bearer ', '').trim();
+  
+  if (!apiKey) {
+    console.error('❌ Empty API key');
+    return { isValid: false };
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('api_keys')
+      .select('id, key_name, is_active, created_at, user_id')
+      .eq('key', apiKey)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      console.error('❌ Supabase query error:', error);
+      return { isValid: false };
+    }
+
+    if (!data) {
+      console.error('❌ API key not found or inactive');
+      return { isValid: false };
+    }
+
+    console.log('✅ API key validated for:', data.key_name);
+    return { isValid: true, keyData: data };
+  } catch (error) {
+    console.error('❌ API key validation error:', error);
+    return { isValid: false };
+  }
 }
 
 const MODEL = "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
@@ -261,42 +306,25 @@ function parseCryptoAgentData(rawStreamData: string): string {
   }
 }
 
-function parseFormatAgentData(rawStreamData: string): string {
-  try {
-    const lines = rawStreamData.split('\n');
-    let templateContent = '';
-    let inTemplateStream = false;
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6));
-
-          if (data.event_name === 'TEMPLATE_STREAM' && data.content_type === 'chunked.text' && data.content) {
-            templateContent += data.content;
-            inTemplateStream = true;
-          }
-
-          if (data.event_name === 'COMPLETE_TEMPLATE' && data.content_type === 'atomic.json') {
-            if (data.content && data.content.template) {
-              templateContent = data.content.template;
-              break;
-            }
-          }
-        } catch {
-        }
-      }
-    }
-
-    return templateContent.trim();
-  } catch (error) {
-    console.error('Error parsing format_agent data:', error);
-    return '';
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('Authorization');
+    const { isValid, keyData } = await validateApiKey(authHeader);
+    
+    if (!isValid) {
+      return withCors(
+        new Response(
+          JSON.stringify({
+            error: "Unauthorized",
+            message: "Invalid or missing API key",
+          }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    }
+
+    console.log('🔑 Authenticated request with API key:', keyData?.key_name);
+
     const body = await req.json();
     const { messages, data } = body;
     const API_KEY = process.env.FIREWORKS_API_KEY;
@@ -335,20 +363,18 @@ Agents available:
 1. "crypto_agent" → cryptocurrency prices and general crypto info
 2. "crypto_detail_agent" → detailed crypto token analysis from contract addresses ${hasContractAddress ? '(ENABLED - contract address detected)' : '(DISABLED - no contract address provided)'}
 3. "web_search" → factual lookup ${data?.deepSearch ? '(ENABLED)' : '(DISABLED - deepSearch not true)'}
-4. "format_agent" → response formatting and structure
-5. "NONE" → answer directly
+4. "NONE" → answer directly
 
 RULES:
 - Use crypto_agent for price queries (BTC, ETH, etc.)
 - Use crypto_detail_agent ONLY when contract addresses are detected
 - Use web_search ONLY when deepSearch is true AND for factual questions
-- Use format_agent for complex responses that need structure
 
 Always return ONLY valid JSON like:
 {"agents":["crypto_agent"]}
 or {"agents":["crypto_detail_agent"]}
 or {"agents":["crypto_agent", "crypto_detail_agent"]}
-or {"agents":["format_agent"]}
+or {"agents":["NONE"]}
 `,
           },
           { role: "user", content: userGoal },
@@ -358,6 +384,7 @@ or {"agents":["format_agent"]}
       }),
     });
 
+    
     const romaPromise = callROMA(userGoal);
 
     const routerRes = await routerPromise;
@@ -399,8 +426,7 @@ or {"agents":["format_agent"]}
         const agentUrls: { [key: string]: string } = {
           crypto_agent: "http://4.188.80.253:8001/assist",
           web_search: "http://4.188.80.253:8000/assist",
-          crypto_detail_agent: "http://4.188.80.253:8003/assist",
-          format_agent: "http://4.188.80.253:8002/assist"
+          crypto_detail_agent: "http://4.188.80.253:8003/assist"
         };
 
         const agentUrl = agentUrls[agentName];
@@ -470,9 +496,6 @@ or {"agents":["format_agent"]}
             case "crypto_agent":
               fullContent = parseCryptoAgentData(rawStreamData);
               break;
-            case "format_agent":
-              fullContent = parseFormatAgentData(rawStreamData);
-              break;
             default:
               fullContent = "No parser available for this agent";
           }
@@ -541,15 +564,9 @@ or {"agents":["format_agent"]}
       romaContext = `## ROMA RESEARCH RESULTS\n${romaResult.content}\n\n`;
     }
 
-    const formatAgent = agentResults.find((a) => a.name === "format_agent");
-    const formatTemplate = formatAgent?.content?.trim() || "";
-    console.log("📋 Format template content length:", formatTemplate.length);
-
     const contextData = [
       romaContext,
-      ...activeAgents
-        .filter((a) => a.name !== "format_agent")
-        .map((a) => `## ${a.name.toUpperCase()} RESULTS\n${a.content}`),
+      ...activeAgents.map((a) => `## ${a.name.toUpperCase()} RESULTS\n${a.content}`),
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -557,7 +574,7 @@ or {"agents":["format_agent"]}
     const systemContent = `
 # PROFESSIONAL AI ASSISTANT
 
-${formatTemplate ? `STRICTLY follow this response template:\n${formatTemplate}` : "Provide a helpful and professional response."}
+Provide a helpful and professional response.
 
 ## AVAILABLE CONTEXT DATA
 ${contextData || "No specific context available."}
@@ -612,7 +629,6 @@ ${contextData || "No specific context available."}
     );
 
     return withCors(successResponse);
-
 
   } catch (error: any) {
     console.error("❌ Main POST error:", error);

@@ -66,6 +66,8 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const abortRef = useRef<AbortController | null>(null);
 
+  const API_KEY = process.env.NEXT_PUBLIC_VISIONAI_API_KEY;
+
   // Hold Supabase client in ref to avoid calling createClient at module load
   const supabaseRef = useRef<any | null>(null);
 
@@ -278,16 +280,16 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         updatedAt: new Date(data.updated_at).getTime(),
         messages: data.messages
           ? data.messages.map((msg: any) => ({
-              id: msg.id,
-              role: msg.role as "user" | "assistant",
-              content: msg.content,
-              ...(msg.image_url && {
-                image: {
-                  url: msg.image_url,
-                  name: "image",
-                },
-              }),
-            }))
+            id: msg.id,
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+            ...(msg.image_url && {
+              image: {
+                url: msg.image_url,
+                name: "image",
+              },
+            }),
+          }))
           : [],
       };
 
@@ -413,11 +415,13 @@ export function useChatLite({ api, chatId }: UseChatLiteOptions) {
         const nextMessages = (messages ?? []).concat(message);
         const res = await fetch(api, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${API_KEY}`
+          },
           body: JSON.stringify({ messages: nextMessages, data: opts?.data }),
           signal: controller.signal,
         });
-
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }

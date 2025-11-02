@@ -154,7 +154,7 @@ export default function ClientChatPage({ user }: PageProps) {
                         </header>
 
                         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background hide-scrollbar">
-                            <div className="max-w-4xl mx-auto px-6 py-4 h-full"> {/* Increased max-width and padding */}
+                            <div className="max-w-4xl mx-auto px-6 py-4 h-full">
                                 {messages.length > 0 ? (
                                     <MessageList messages={messages} isLoading={isLoading} />
                                 ) : (
@@ -171,7 +171,7 @@ export default function ClientChatPage({ user }: PageProps) {
 
                         {messages.length > 0 && (
                             <footer className="flex-shrink-0 bg-background border-t border-border px-4 py-3">
-                                <div className="max-w-4xl mx-auto"> {/* Increased max-width to match message area */}
+                                <div className="max-w-4xl mx-auto">
                                     <ChatInput
                                         value={input}
                                         onChange={setInput}
@@ -210,7 +210,7 @@ function EmptyState({ input, setInput, selectedAIModel, send, isLoading }: any) 
     const prePrompts = [
         { icon: Zap, text: "ETH Price", prompt: "What is the ETH price?" },
         { icon: Bitcoin, text: "Check Token", prompt: "This is Contract Address: 0x6982508145454ce325ddbe47a25d4ec3d2311933 , tell me about the coin." },
-        { icon: ShieldCheck, text: "Search Sentient", prompt: "Search about Sentient?" },
+        { icon: ShieldCheck, text: "Search Sentient", prompt: "Search about Sentient AGI" },
     ]
 
     const handlePrePromptClick = (prompt: string) => {

@@ -24,6 +24,7 @@ import {
   LogOut,
   X,
   Rotate3d,
+  Network,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -250,17 +251,17 @@ export default function ChatSidebar({
       <SidebarHeader className="sticky top-0 z-10 backdrop-blur mt-2">
         <div className="flex items-center gap-3 px-3">
           <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center shadow-sm">
-  <Rotate3d className="h-8 w-8 text-primary" />
-</div>
+            <Rotate3d className="h-8 w-8 text-primary" />
+          </div>
           <span className="text-lg font-semibold text-primary tracking-tight select-none">
             VisionAI
           </span>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
-        {/* Main menu */}
-        <div className="px-2 py-3 space-y-2">
+      <SidebarContent className="flex-1 overflow-x-hidden">
+        {/* Main menu - NOT scrollable */}
+        <div className="px-2 py-3 space-y-2 flex-shrink-0">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -280,114 +281,130 @@ export default function ChatSidebar({
               <div ref={containerRef} className="relative w-full">
                 {isSearching ? (
                   <>
-                  <SidebarMenuButton
-                    className="rounded-xl px-3 py-3 flex items-center gap-3 justify-start transition"
-                  >
-                    <Search className="h-8 w-8 text-muted-foreground shrink-0" />
-                    <input
-                      type="text"
-                      autoFocus
-                      placeholder="Search chats..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="bg-transparent text-[16px] font-medium w-full outline-none border-none placeholder:text-muted-foreground/70"
-                    />
-                    <button
-                      onClick={() => {
-                        setSearchQuery("");
-                        setIsSearching(false);
-                      }}
-                      className="p-1 hover:bg-accent rounded"
+                    <SidebarMenuButton
+                      className="rounded-xl px-3 py-3 flex items-center gap-3 justify-start transition"
                     >
-                      <X className="h-5 w-5 text-muted-foreground" />
-                    </button>
-                  </SidebarMenuButton>
-                  <SidebarSeparator/>
+                      <Search className="h-8 w-8 text-muted-foreground shrink-0" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Search chats..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-transparent text-[16px] font-medium w-full outline-none border-none placeholder:text-muted-foreground/70"
+                      />
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setIsSearching(false);
+                        }}
+                        className="p-1 hover:bg-accent rounded"
+                      >
+                        <X className="h-5 w-5 text-muted-foreground" />
+                      </button>
+                    </SidebarMenuButton>
+                    <SidebarSeparator />
                   </>
                 ) : (
                   <>
-                  <SidebarMenuButton
-                    onClick={() => setIsSearching(true)}
-                    className="rounded-xl hover:bg-accent/50 px-3 py-3 flex items-center gap-3 justify-start transition"
-                  >
-                    <Search className="h-8 w-8 shrink-0 text-muted-foreground" />
-                    <span className="text-[16px] font-medium truncate">Search Chats</span>
-                  </SidebarMenuButton>
-                  <SidebarSeparator/>
+                    <SidebarMenuButton
+                      onClick={() => setIsSearching(true)}
+                      className="rounded-xl hover:bg-accent/50 px-3 py-3 flex items-center gap-3 justify-start transition"
+                    >
+                      <Search className="h-8 w-8 shrink-0 text-muted-foreground" />
+                      <span className="text-[16px] font-medium truncate">Search Chats</span>
+                    </SidebarMenuButton>
+                    <SidebarSeparator />
                   </>
                 )}
               </div>
             </SidebarMenuItem>
+            
+            <SidebarMenuItem>
+              <Link href="/docs/api" legacyBehavior>
+                <SidebarMenuButton
+                  className="rounded-xl hover:bg-accent/50 transition px-3 py-3 flex items-center gap-3 justify-start mb-2 w-full"
+                  onClick={() => {
+                    if (window.innerWidth < 768) toggleSidebar();
+                  }}
+                >
+                  <Network className="h-8 w-8 shrink-0 text-muted-foreground" />
+                  <span className="text-[16px] font-medium truncate">API playground</span>
+                </SidebarMenuButton>
+              </Link>
+              <SidebarSeparator />
+            </SidebarMenuItem>
           </SidebarMenu>
         </div>
 
-        {/* Chat list */}
-        <div className="p-2">
-          <p className="px-3 py-1 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            {searchQuery
-              ? `Search Results (${filteredChats.length})`
-              : user
-                ? "Recent Chats"
-                : "Current Session"}
-          </p>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="p-2">
+            <p className="px-3 py-1 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              {searchQuery
+                ? `Search Results (${filteredChats.length})`
+                : user
+                  ? "Recent Chats"
+                  : "Current Session"}
+            </p>
 
-          {chatLoading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Loading chats...</div>
-          )}
+            {chatLoading && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">Loading chats...</div>
+            )}
 
-          <SidebarMenu>
+            <SidebarMenu>
 
-            {filteredChats.map((chat) => (
-              <SidebarMenuItem
-                key={chat.id}
-                onMouseEnter={() => setHoveredChatId(chat.id)}
-                onMouseLeave={() => setHoveredChatId(null)}
-              >
-                <SidebarMenuButton
-                  onClick={() => {
-                    handleSelectChat(chat.id);
-                    if (window.innerWidth < 768) toggleSidebar();
-                  }}
-                  isActive={activeId === chat.id}
-                  className={`rounded-lg px-3 py-2.5 flex items-center justify-between transition
+              {filteredChats.map((chat) => (
+                <SidebarMenuItem
+                  key={chat.id}
+                  onMouseEnter={() => setHoveredChatId(chat.id)}
+                  onMouseLeave={() => setHoveredChatId(null)}
+                >
+                  <SidebarMenuButton
+                    onClick={() => {
+                      handleSelectChat(chat.id);
+                      if (window.innerWidth < 768) toggleSidebar();
+                    }}
+                    isActive={activeId === chat.id}
+                    className={`rounded-lg px-3 py-2.5 flex items-center justify-between transition
         ${activeId === chat.id ? "bg-[var(--muted)]" : "hover:bg-[var(--card)]"} 
         ${hoveredChatId === chat.id ? "bg-[var(--muted)]/90" : ""}
         `}
-                >
-                  <span className="flex-1 truncate text-sm">{chat.title}</span>
+                  >
+                    <span className="flex-1 truncate text-sm">{chat.title}</span>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className={`transition-opacity p-1 hover:bg-[var(--hover)] rounded cursor-pointer
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className={`transition-opacity p-1 hover:bg-[var(--hover)] rounded cursor-pointer
               ${hoveredChatId === chat.id ? "opacity-100" : "opacity-0"}`}
+                        >
+                          <MoreHorizontal className="h-5 w-5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        className="bg-[var(--card)] border rounded-xl"
+                        align="end"
                       >
-                        <MoreHorizontal className="h-5 w-5" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      className="bg-[var(--card)] border rounded-xl"
-                      align="end"
-                    >
-                      <DropdownMenuItem
-                        onClick={(e) => deleteChat(chat.id, e)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="h-5 w-5 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+                        <DropdownMenuItem
+                          onClick={(e) => deleteChat(chat.id, e)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-5 w-5 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </div>
         </div>
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="sticky bottom-0 px-3 py-2 backdrop-blur">
+      <SidebarFooter className="sticky bottom-0 px-3 py-2 backdrop-blur flex-shrink-0">
         {!user && (
           <div className="w-full bg-background text-foreground rounded-xl border border-border p-4 space-y-3 shadow-sm">
             <div>
