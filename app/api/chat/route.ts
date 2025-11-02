@@ -86,6 +86,30 @@ async function validateApiKey(authHeader: string | null): Promise<{ isValid: boo
 
 const MODEL = "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
 
+const ROMA_CONFIG = {
+  TIMEOUT_MS: 5000,
+  ENABLED: true,
+};
+
+function shouldSkipROMA(query: string): boolean {
+  const skipPatterns = [
+    /what'?s up/i,
+    /hello/i,
+    /hi\b/i,
+    /hey\b/i,
+    /how are you/i,
+    /good morning/i,
+    /good afternoon/i,
+    /good evening/i,
+    /\bhey\b/i,
+    /greetings/i,
+    /how's it going/i,
+    /what's new/i
+  ];
+  
+  return skipPatterns.some(pattern => pattern.test(query));
+}
+
 async function callROMA(userGoal: string): Promise<ROMAResponse> {
   const startTime = Date.now();
 
@@ -158,23 +182,6 @@ async function callROMA(userGoal: string): Promise<ROMAResponse> {
 
       await new Promise((r) => setTimeout(r, 1000));
     }
-    const finalRes = await fetch(`http://localhost:5000/api/projects/${id}/load-results`);
-    if (finalRes.ok) {
-      const results = await finalRes.json();
-      const nodes = results?.basic_state?.all_nodes || {};
-
-      for (const key in nodes) {
-        if (nodes[key]?.task_type === "WRITE" && nodes[key]?.full_result?.output_text) {
-          const responseTime = Date.now() - startTime;
-          return {
-            content: nodes[key].full_result.output_text,
-            projectId: id,
-            status: "success",
-            metadata: { responseTime, attempts: maxAttempts },
-          };
-        }
-      }
-    }
 
     throw new Error(`ROMA timeout after ${maxAttempts} attempts`);
   } catch (error: any) {
@@ -187,6 +194,33 @@ async function callROMA(userGoal: string): Promise<ROMAResponse> {
       metadata: { responseTime: Date.now() - startTime },
     };
   }
+}
+
+function startROMABackground(userGoal: string): void {
+  if (!ROMA_CONFIG.ENABLED) {
+    console.log('⏩ ROMA disabled by configuration');
+    return;
+  }
+
+  if (shouldSkipROMA(userGoal)) {
+    console.log('⏩ Skipping ROMA for casual conversation query');
+    return;
+  }
+
+  console.log('🎯 Starting ROMA in background (non-blocking)...');
+  
+  callROMA(userGoal)
+    .then(romaData => {
+      if (romaData.status === 'success' && romaData.content) {
+        console.log('✅ ROMA background completion successful');
+        console.log(`📊 ROMA content length: ${romaData.content.length}`);
+      } else {
+        console.log('❌ ROMA background completed with error:', romaData.error);
+      }
+    })
+    .catch(error => {
+      console.log('🔇 ROMA background error (non-blocking):', error.message);
+    });
 }
 
 function containsContractAddress(text: string): boolean {
@@ -306,7 +340,43 @@ function parseCryptoAgentData(rawStreamData: string): string {
   }
 }
 
+function parseFormatAgentData(rawStreamData: string): string {
+  try {
+    const lines = rawStreamData.split('\n');
+    let templateContent = '';
+    let inTemplateStream = false;
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+
+          if (data.event_name === 'TEMPLATE_STREAM' && data.content_type === 'chunked.text' && data.content) {
+            templateContent += data.content;
+            inTemplateStream = true;
+          }
+
+          if (data.event_name === 'COMPLETE_TEMPLATE' && data.content_type === 'atomic.json') {
+            if (data.content && data.content.template) {
+              templateContent = data.content.template;
+              break;
+            }
+          }
+        } catch {
+        }
+      }
+    }
+
+    return templateContent.trim();
+  } catch (error) {
+    console.error('Error parsing format_agent data:', error);
+    return '';
+  }
+}
+
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const authHeader = req.headers.get('Authorization');
     const { isValid, keyData } = await validateApiKey(authHeader);
@@ -347,9 +417,9 @@ export async function POST(req: NextRequest) {
     console.log("📄 Contract address detected:", hasContractAddress);
     if (hasContractAddress) console.log("📍 Contract addresses found:", contractAddresses);
 
-    console.log("⚡ Starting Router and ROMA in parallel...");
+    console.log("⚡ Starting Router...");
 
-    const routerPromise = fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
+    const routerRes = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
       body: JSON.stringify({
@@ -363,18 +433,20 @@ Agents available:
 1. "crypto_agent" → cryptocurrency prices and general crypto info
 2. "crypto_detail_agent" → detailed crypto token analysis from contract addresses ${hasContractAddress ? '(ENABLED - contract address detected)' : '(DISABLED - no contract address provided)'}
 3. "web_search" → factual lookup ${data?.deepSearch ? '(ENABLED)' : '(DISABLED - deepSearch not true)'}
-4. "NONE" → answer directly
+4. "format_agent" → response formatting and structure
+5. "NONE" → answer directly
 
 RULES:
 - Use crypto_agent for price queries (BTC, ETH, etc.)
 - Use crypto_detail_agent ONLY when contract addresses are detected
 - Use web_search ONLY when deepSearch is true AND for factual questions
+- Use format_agent for complex responses that need structure
 
 Always return ONLY valid JSON like:
 {"agents":["crypto_agent"]}
 or {"agents":["crypto_detail_agent"]}
 or {"agents":["crypto_agent", "crypto_detail_agent"]}
-or {"agents":["NONE"]}
+or {"agents":["format_agent"]}
 `,
           },
           { role: "user", content: userGoal },
@@ -384,10 +456,6 @@ or {"agents":["NONE"]}
       }),
     });
 
-    
-    const romaPromise = callROMA(userGoal);
-
-    const routerRes = await routerPromise;
     if (!routerRes.ok) {
       throw new Error(`Router API failed with status: ${routerRes.status}`);
     }
@@ -417,6 +485,8 @@ or {"agents":["NONE"]}
 
     console.log("🧭 Router decision:", selectedAgents);
 
+    startROMABackground(userGoal);
+
     const safAgentsPromise = Promise.all(
       selectedAgents.map(async (agentName): Promise<AgentResponse> => {
         if (agentName === "NONE") {
@@ -426,7 +496,8 @@ or {"agents":["NONE"]}
         const agentUrls: { [key: string]: string } = {
           crypto_agent: "http://4.188.80.253:8001/assist",
           web_search: "http://4.188.80.253:8000/assist",
-          crypto_detail_agent: "http://4.188.80.253:8003/assist"
+          crypto_detail_agent: "http://4.188.80.253:8003/assist",
+          format_agent: "http://4.188.80.253:8002/assist"
         };
 
         const agentUrl = agentUrls[agentName];
@@ -496,6 +567,9 @@ or {"agents":["NONE"]}
             case "crypto_agent":
               fullContent = parseCryptoAgentData(rawStreamData);
               break;
+            case "format_agent":
+              fullContent = parseFormatAgentData(rawStreamData);
+              break;
             default:
               fullContent = "No parser available for this agent";
           }
@@ -531,42 +605,14 @@ or {"agents":["NONE"]}
 
     console.log(`✅ SAF agents completed: ${activeAgents.map((a) => a.name).join(", ")}`);
 
-    let romaResult: ROMAResponse;
-    try {
-      romaResult = await Promise.race([
-        romaPromise,
-        new Promise<ROMAResponse>((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                content: "",
-                projectId: "",
-                status: "error",
-                error: "ROMA timeout - proceeding without full results",
-                metadata: { responseTime: 0 },
-              }),
-            30000
-          )
-        ),
-      ]);
-    } catch {
-      romaResult = {
-        content: "",
-        projectId: "",
-        status: "error",
-        error: "ROMA failed",
-        metadata: { responseTime: 0 },
-      };
-    }
-
-    let romaContext = "";
-    if (romaResult.status === "success" && romaResult.content) {
-      romaContext = `## ROMA RESEARCH RESULTS\n${romaResult.content}\n\n`;
-    }
+    const formatAgent = agentResults.find((a) => a.name === "format_agent");
+    const formatTemplate = formatAgent?.content?.trim() || "";
+    console.log("📋 Format template content length:", formatTemplate.length);
 
     const contextData = [
-      romaContext,
-      ...activeAgents.map((a) => `## ${a.name.toUpperCase()} RESULTS\n${a.content}`),
+      ...activeAgents
+        .filter((a) => a.name !== "format_agent")
+        .map((a) => `## ${a.name.toUpperCase()} RESULTS\n${a.content}`),
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -574,7 +620,7 @@ or {"agents":["NONE"]}
     const systemContent = `
 # PROFESSIONAL AI ASSISTANT
 
-Provide a helpful and professional response.
+${formatTemplate ? `STRICTLY follow this response template:\n${formatTemplate}` : "Provide a helpful and professional response."}
 
 ## AVAILABLE CONTEXT DATA
 ${contextData || "No specific context available."}
@@ -615,14 +661,18 @@ ${contextData || "No specific context available."}
     const finalData = await finalResponse.json();
     const aiContent = finalData.choices?.[0]?.message?.content || "No AI response generated.";
 
+    const totalTime = Date.now() - startTime;
+    console.log(`✅ Request completed in ${totalTime}ms`);
+
     const successResponse = new Response(
       JSON.stringify({
         message: aiContent,
         agents: activeAgents,
-        roma: romaResult,
+        roma: { status: "processing_in_background" },
         deepSearch: data?.deepSearch === true,
         contractAddressDetected: hasContractAddress,
         contractAddresses,
+        processingTime: totalTime,
         timestamp: new Date().toISOString(),
       }),
       { headers: { "Content-Type": "application/json" } }
