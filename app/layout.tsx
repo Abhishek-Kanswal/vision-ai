@@ -11,8 +11,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 export const metadata: Metadata = {
   title: "Vision AI",
   description: "Chat with Vision AI",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{

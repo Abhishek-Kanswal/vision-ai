@@ -23,6 +23,7 @@ import {
   Trash2,
   LogOut,
   X,
+  Rotate3d,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -248,19 +249,16 @@ export default function ChatSidebar({
       {/* Header */}
       <SidebarHeader className="sticky top-0 z-10 backdrop-blur mt-2">
         <div className="flex items-center gap-3 px-3">
-          <div
-            className="h-12 w-12 rounded-xl bg-cover bg-center shadow-sm"
-            style={{ backgroundImage: 'url("/sentient.avif")' }}
-          />
+          <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center shadow-sm">
+  <Rotate3d className="h-8 w-8 text-primary" />
+</div>
           <span className="text-lg font-semibold text-primary tracking-tight select-none">
             VisionAI
           </span>
         </div>
       </SidebarHeader>
 
-      {/* Content */}
       <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
-        {/* Main menu */}
         {/* Main menu */}
         <div className="px-2 py-3 space-y-2">
           <SidebarMenu>
@@ -294,8 +292,6 @@ export default function ChatSidebar({
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="bg-transparent text-[16px] font-medium w-full outline-none border-none placeholder:text-muted-foreground/70"
                     />
-
-                    {/* Clear (also closes if empty) */}
                     <button
                       onClick={() => {
                         setSearchQuery("");
@@ -418,7 +414,6 @@ export default function ChatSidebar({
               <div className="flex items-center justify-between w-full rounded-lg px-3 py-3 bg-popover hover:bg-accent/50 transition">
                 <div className="flex items-center gap-3 min-w-0">
 
-                  {/* Avatar or Fallback Letter Icon */}
                   {!avatarError ? (
                     <img
                       src={avatarUrl}
@@ -438,7 +433,6 @@ export default function ChatSidebar({
                     </div>
                   )}
 
-                  {/* User Text */}
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium text-foreground truncate">
                       {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
@@ -449,7 +443,6 @@ export default function ChatSidebar({
                   </div>
                 </div>
 
-                {/* Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button

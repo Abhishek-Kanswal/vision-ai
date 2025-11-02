@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CodeBlock } from "@/components/ui/code-block"
 
+interface FeedbackData {
+  [messageId: string]: "like" | "dislike" | null
+}
+
 export function MessageList({
   messages,
   isLoading,
@@ -26,10 +30,29 @@ export function MessageList({
   const [copiedText, setCopiedText] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
-  const [feedback, setFeedback] = useState<Record<number, "like" | "dislike" | null>>({})
+  const [feedback, setFeedback] = useState<FeedbackData>({})
 
-  useEffect(() => setMounted(true), [])
-  useEffect(() => setIsGenerating(messages.length % 2 !== 0), [messages.length])
+  useEffect(() => {
+    setMounted(true)
+    const savedFeedback = localStorage.getItem("chat-feedback")
+    if (savedFeedback) {
+      try {
+        setFeedback(JSON.parse(savedFeedback))
+      } catch (error) {
+        console.error("Failed to load feedback from localStorage:", error)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("chat-feedback", JSON.stringify(feedback))
+    }
+  }, [feedback, mounted])
+
+  useEffect(() => {
+    setIsGenerating(messages.length % 2 !== 0)
+  }, [messages.length])
 
   useEffect(() => {
     if (!isAtBottom) return
@@ -54,33 +77,40 @@ export function MessageList({
   }, [])
 
   const handleFeedback = useCallback((messageIndex: number, type: "like" | "dislike") => {
-    setFeedback((prev) => ({
-      ...prev,
-      [messageIndex]: prev[messageIndex] === type ? null : type,
-    }))
-  }, [])
+    const messageId = `${messageIndex}-${messages[messageIndex]?.content?.substring(0, 50)}`
+    
+    setFeedback((prev) => {
+      const newFeedback = {
+        ...prev,
+        [messageId]: prev[messageId] === type ? null : type,
+      }
+      return newFeedback
+    })
+  }, [messages])
+
+  const getMessageFeedback = useCallback((messageIndex: number) => {
+    const messageId = `${messageIndex}-${messages[messageIndex]?.content?.substring(0, 50)}`
+    return feedback[messageId] || null
+  }, [feedback, messages])
 
   if (!mounted) return null
 
   return (
     <div ref={containerRef} className="flex flex-col h-full overflow-y-auto overflow-x-hidden scroll-smooth">
-      <div className="flex flex-col gap-4 pb-32 px-2 md:px-4">
+      <div className="flex flex-col pb-32 px-2 md:px-4">
+        {messages.length > 0 && <div className="h-8" />}
+        
         {messages.map((m, i) => {
           const isUser = m.role === "user"
           const isLast = i === messages.length - 1
+          const messageFeedback = getMessageFeedback(i)
 
           return (
             <div
               key={i}
               ref={isLast && !isLoading ? lastMessageRef : null}
-              className={`flex items-start gap-2 md:gap-3 w-full ${isUser ? "justify-end" : "justify-start"}`}
+              className={`flex items-start gap-2 md:gap-3 w-full ${isUser ? "justify-end" : "justify-start"} mb-6`}
             >
-              {!isUser && (
-                <div className="hidden md:flex mt-1 h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
-                  <img src="/sentient.avif" alt="AI" className="h-full w-full object-cover" />
-                </div>
-              )}
-
               <div className="flex flex-col gap-2 w-full">
                 <div
                   className={`${
@@ -89,7 +119,6 @@ export function MessageList({
                       : "max-w-full md:max-w-[90%] bg-transparent text-foreground px-1 md:px-3 py-2"
                   } rounded-2xl text-sm leading-relaxed break-words overflow-hidden`}
                 >
-                  {/* Image */}
                   {m.image && (
                     <img
                       src={m.image.url || "/placeholder.svg"}
@@ -97,8 +126,6 @@ export function MessageList({
                       className="w-full max-h-[250px] rounded-lg object-contain shadow-sm"
                     />
                   )}
-
-                  {/* Text / Markdown */}
                   {!isUser ? (
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
@@ -181,7 +208,7 @@ export function MessageList({
                             size="sm"
                             onClick={() => handleFeedback(i, "like")}
                             className={`h-8 w-8 p-0 hover:bg-muted ${
-                              feedback[i] === "like" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                              messageFeedback === "like" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
                             }`}
                           >
                             <ThumbsUp className="h-4 w-4" />
@@ -201,7 +228,7 @@ export function MessageList({
                             size="sm"
                             onClick={() => handleFeedback(i, "dislike")}
                             className={`h-8 w-8 p-0 hover:bg-muted ${
-                              feedback[i] === "dislike" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                              messageFeedback === "dislike" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
                             }`}
                           >
                             <ThumbsDown className="h-4 w-4" />
@@ -219,12 +246,8 @@ export function MessageList({
           )
         })}
 
-        {/* Typing indicator */}
         {isGenerating && (
-          <div className="flex items-start gap-2 md:gap-3 justify-start" ref={lastMessageRef}>
-            <div className="hidden md:flex mt-1 h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
-              <img src="/sentient.avif" alt="AI" className="h-full w-full object-cover" />
-            </div>
+          <div className="flex items-start gap-2 md:gap-3 justify-start mb-6" ref={lastMessageRef}>
             <div className="max-w-full md:max-w-[90%] rounded-2xl bg-transparent text-foreground px-1 md:px-3 py-2">
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <span>Generating</span>

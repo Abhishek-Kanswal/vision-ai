@@ -16,9 +16,8 @@ interface PageProps {
 }
 
 export default function ClientChatPage({ user }: PageProps) {
-    const [selectedAIModel, setSelectedAIModel] = useState("Dobby-3.3-70B")
+    const [selectedAIModel, setSelectedAIModel] = useState("VisionAI 1.0")
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(true)
-    const [showNotification, setShowNotification] = useState(true)
     const [renamingConversations, setRenamingConversations] = useState<Set<string>>(new Set())
     const [hydrated, setHydrated] = useState(false)
 
@@ -44,15 +43,6 @@ export default function ClientChatPage({ user }: PageProps) {
     const handleNewChat = () => {
         if (typeof newConversation === "function") newConversation()
     }
-
-    const getModelString = useCallback((name: string) => {
-        const modelMap: Record<string, string> = {
-            "Dobby-3.3-70B": "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new",
-            "Dobby Mini Plus 3.1 8B":
-                "accounts/sentientfoundation-serverless/models/dobby-mini-unhinged-plus-llama-3-1-8b",
-        }
-        return modelMap[name] || name
-    }, [])
 
     const generateChatTitle = useCallback(
         async (conversationId: string, userMessage: string) => {
@@ -101,7 +91,7 @@ export default function ClientChatPage({ user }: PageProps) {
             const previousMessageCount = messages.length
 
             await append(userMessage, {
-                data: { model: getModelString(selectedAIModel), deepSearch, attachmentsText },
+                data: { deepSearch, attachmentsText },
             })
 
             const convId = activeId ?? conversations?.[0]?.id
@@ -117,7 +107,6 @@ export default function ClientChatPage({ user }: PageProps) {
             input,
             messages,
             append,
-            getModelString,
             selectedAIModel,
             isSidebarExpanded,
             setInput,
@@ -142,117 +131,85 @@ export default function ClientChatPage({ user }: PageProps) {
                 renamingIds={renamingConversations}
                 variant="inset"
             />
-            <SidebarInset>
+            <SidebarInset className="flex flex-col h-screen overflow-hidden">
                 <div className="flex items-center justify-center h-full w-full bg-[var(--secondary)]">
                     <div className="flex flex-col bg-background text-foreground w-[98%] h-[98%] rounded-2xl shadow-lg p-2 m-auto">
-                        {/* Header */}
-                        <header className="sticky top-0 z-10 bg-background border-b border-border px-4 py-2 flex items-center gap-3 min-h-[56px]">
-                            <SidebarTrigger className="h-9 w-9 p-0 hover:bg-accent" />
+                        <header className="flex-shrink-0 bg-background border-b border-border px-4 py-2 flex items-center gap-3 z-10">
+                            <SidebarTrigger className="h-8 w-8 p-0 hover:bg-accent" />
                             <div className="flex-1 flex items-center gap-2">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium bg-muted hover:bg-muted/70 text-foreground">
+                                        <button className="flex items-center gap-1 rounded-md px-3 py-1 text-sm font-medium bg-muted hover:bg-muted/70 text-foreground transition-colors">
                                             {selectedAIModel}
-                                            <ChevronDown className="h-4 w-4 opacity-70" />
+                                            <ChevronDown className="h-3 w-3 opacity-70" />
                                         </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-56 bg-background border border-border text-foreground">
-                                        {["Dobby-3.3-70B", "Dobby Mini Plus 3.1 8B"].map((model) => (
-                                            <DropdownMenuItem
-                                                key={model}
-                                                onClick={() => setSelectedAIModel(model)}
-                                                className={`flex justify-between px-3 py-2 rounded-md cursor-pointer ${selectedAIModel === model
-                                                    ? "bg-accent/40 text-primary"
-                                                    : "hover:bg-accent/30"
-                                                    }`}
-                                            >
-                                                {model}
-                                                <ExternalLink className="h-3.5 w-3.5 opacity-50" />
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
                                 </DropdownMenu>
                                 {dbLoading && (
-                                    <div className="ml-auto">
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground"></div>
+                                    <div className="ml-2">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-foreground"></div>
                                     </div>
                                 )}
                             </div>
                         </header>
 
-                        {/* Main Content */}
-                        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 relative">
-                            {messages.length > 0 ? (
-                                <>
-                                    <section className="flex-1 overflow-y-auto scrollbar-none py-4">
-                                        <MessageList messages={messages} isLoading={isLoading} />
-                                    </section>
-
-                                    <div className="sticky bottom-0 border-t border-border py-4 bg-background">
-                                        <ChatInput
-                                            value={input}
-                                            onChange={setInput}
-                                            onSend={send}
-                                            disabled={isLoading}
-                                            isLoading={isLoading}
-                                            messages={messages}
-                                            selectedModel={selectedAIModel}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <EmptyState
-                                    input={input}
-                                    setInput={setInput}
-                                    send={send}
-                                    isLoading={isLoading}
-                                    selectedAIModel={selectedAIModel}
-                                    messages={messages}
-                                />
-                            )}
+                        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background hide-scrollbar">
+                            <div className="max-w-4xl mx-auto px-6 py-4 h-full"> {/* Increased max-width and padding */}
+                                {messages.length > 0 ? (
+                                    <MessageList messages={messages} isLoading={isLoading} />
+                                ) : (
+                                    <EmptyState
+                                        selectedAIModel={selectedAIModel}
+                                        send={send}
+                                        input={input}
+                                        setInput={setInput}
+                                        isLoading={isLoading}
+                                    />
+                                )}
+                            </div>
                         </main>
+
+                        {messages.length > 0 && (
+                            <footer className="flex-shrink-0 bg-background border-t border-border px-4 py-3">
+                                <div className="max-w-4xl mx-auto"> {/* Increased max-width to match message area */}
+                                    <ChatInput
+                                        value={input}
+                                        onChange={setInput}
+                                        onSend={send}
+                                        disabled={isLoading}
+                                        isLoading={isLoading}
+                                        messages={messages}
+                                        selectedModel={selectedAIModel}
+                                    />
+                                </div>
+                            </footer>
+                        )}
                     </div>
                 </div>
-
-                 {/* Notification */}
-            {messages.length === 0 && showNotification && (
-              <div className="absolute bottom-[80px] left-1/2 -translate-x-1/2 bg-popover border border-border rounded-lg px-4 py-3 flex items-center gap-3 max-w-md shadow-md w-[90%] md:w-auto text-center animate-in fade-in slide-in-from-bottom-2">
-                <p className="text-primary text-sm font-medium flex-1">VisionAI is now available to test in beta</p>
-                <button
-                  onClick={() => setShowNotification(false)}
-                  className="text-muted-foreground hover:text-foreground ml-auto transition-colors"
-                  aria-label="Close notification"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
             </SidebarInset>
-        </SidebarProvider>
+
+            <style jsx global>{`
+                .hide-scrollbar {
+                    -ms-overflow-style: none !important;
+                    scrollbar-width: none !important;
+                }
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
+                    background: transparent !important;
+                    -webkit-appearance: none !important;
+                }
+            `}</style>
+
+        </SidebarProvider >
     )
 }
 
-function EmptyState({ input, setInput, send, isLoading, selectedAIModel }: any) {
-    const [greeting, setGreeting] = useState<{ type: "genius" | "time"; text: string } | null>(null)
-
-    useEffect(() => {
-        const greetings = ["Good Morning", "Good Afternoon", "Good Evening"]
-        const randomTimeGreeting = greetings[Math.floor(Math.random() * greetings.length)]
-        const randomChoice = Math.random() < 0.5 ? "genius" : "time"
-
-        if (randomChoice === "genius") {
-            setGreeting({ type: "genius", text: "What can I help you build today, Genius?" })
-        } else {
-            setGreeting({ type: "time", text: `${randomTimeGreeting}, there.` })
-        }
-    }, [])
-
-    if (!greeting) return null
-
+function EmptyState({ input, setInput, selectedAIModel, send, isLoading }: any) {
     const prePrompts = [
         { icon: Zap, text: "ETH Price", prompt: "What is the ETH price?" },
-        { icon: Bitcoin, text: "Contract Address", prompt: "This is Contract Address : 0x6982508145454ce325ddbe47a25d4ec3d2311933 , tell me bout the coin." },
+        { icon: Bitcoin, text: "Check Token", prompt: "This is Contract Address: 0x6982508145454ce325ddbe47a25d4ec3d2311933 , tell me about the coin." },
         { icon: ShieldCheck, text: "Search Sentient", prompt: "Search about Sentient?" },
     ]
 
@@ -268,25 +225,12 @@ function EmptyState({ input, setInput, send, isLoading, selectedAIModel }: any) 
     return (
         <div className="flex flex-col items-center gap-5 text-center mt-24 md:mt-36 w-full">
             <div className="text-5xl font-bold text-muted-foreground max-w-xl leading-tight">
-                {greeting.type === "genius" ? (
-                    <>
-                        What can I help you build today,{" "}
-                        <ShinyText text="Genius" disabled={false} speed={3} className="custom-class" />?
-                    </>
-                ) : (
-                    <>
-                        {greeting.text.split(", ")[0]},{" "}
-                        <ShinyText
-                            text={greeting.text.split(", ")[1]}
-                            disabled={false}
-                            speed={3}
-                            className="custom-class"
-                        />
-                    </>
-                )}
+                What can I help you build today,{" "}
+                <ShinyText text="Genius" disabled={false} speed={3} className="custom-class" />?
             </div>
 
-            <div className="w-full max-w-3xl">
+            {/* Chat Input for Desktop */}
+            <div className="w-full max-w-4xl hidden md:block">
                 <ChatInput
                     value={input}
                     onChange={setInput}
@@ -298,16 +242,30 @@ function EmptyState({ input, setInput, send, isLoading, selectedAIModel }: any) 
                 />
             </div>
 
-            <div className="flex gap-3 flex-wrap justify-start w-full max-w-3xl mt-2">
+            {/* Chat Input for Mobile */}
+            <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border md:hidden px-4 py-3 z-50">
+                <ChatInput
+                    value={input}
+                    onChange={setInput}
+                    onSend={send}
+                    disabled={isLoading}
+                    isLoading={isLoading}
+                    messages={[]}
+                    selectedModel={selectedAIModel}
+                />
+            </div>
+
+            {/* Suggestions */}
+            <div className="flex gap-3 flex-wrap justify-start w-full max-w-4xl mt-2">
                 {prePrompts.map(({ icon: Icon, text, prompt }, i) => (
-                    <div
+                    <button
                         key={i}
                         onClick={() => handlePrePromptClick(prompt)}
                         className="flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-card hover:bg-muted transition cursor-pointer"
                     >
                         <Icon className="w-4 h-4" />
                         <span className="text-sm font-medium">{text}</span>
-                    </div>
+                    </button>
                 ))}
             </div>
         </div>

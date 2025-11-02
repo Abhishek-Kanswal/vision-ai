@@ -14,23 +14,31 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.FIREWORKS_API_KEY;
     if (!apiKey) {
-      console.error("FIREWORKS_API_KEY is not configured");
-      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+      console.error("Missing FIREWORKS_API_KEY");
+      return NextResponse.json({ error: "Server config error" }, { status: 500 });
     }
 
     const truncatedMessage =
       userMessage.length > 500 ? userMessage.substring(0, 500) + "..." : userMessage;
 
     const prompt = `
-Generate a short, catchy chat title (2-5 words) based on this user message:
+You are a helpful AI that creates chat titles ONLY.
+Generate a short title based on this message:
 "${truncatedMessage}"
-Do NOT reply to the user. ONLY return the title, no punctuation, no quotes, no explanation.
+
+RULES:
+- Exactly **2 to 3 words** folow strictly 
+- No punctuation (no . , ! ?)
+- No quotes
+- No emojis
+- No prefix text or explanation
+Just output the title ONLY.
     `;
 
     const payload = {
       model: MODEL,
       prompt,
-      max_tokens: 20,
+      max_tokens: 12,
       temperature: 0.6,
     };
 
@@ -50,22 +58,23 @@ Do NOT reply to the user. ONLY return the title, no punctuation, no quotes, no e
     }
 
     const data = await response.json();
-
     let title = data?.choices?.[0]?.text?.trim();
 
-    if (title) {
-      title = title.replace(/^["']|["']$/g, "").trim();
-      if (title.length > 30) title = title.substring(0, 30).trim() + "...";
-    }
+    if (!title) title = "New Chat";
 
-    if (!title || title.length < 2) {
-      const words = truncatedMessage.split(/\s+/).slice(0, 3);
-      title = words.join(" ") || "New Chat";
+    title = title.replace(/[.,!?;:"'(){}[\]-]/g, "").trim();
+
+    const words = title.split(/\s+/).filter(Boolean);
+    if (words.length < 2) {
+      const fallbackWords = truncatedMessage.split(/\s+/).slice(0, 3);
+      title = fallbackWords.join(" ") || "New Chat";
+    } else if (words.length > 3) {
+      title = words.slice(0, 3).join(" ");
     }
 
     return NextResponse.json({ title });
   } catch (error) {
-    console.error("Error generating chat title:", error);
-    return NextResponse.json({ title: "New Chat", error: "Internal server error" }, { status: 500 });
+    console.error("Chat title generation failed:", error);
+    return NextResponse.json({ title: "New Chat" }, { status: 200 });
   }
 }
