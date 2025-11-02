@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { ulid } from "ulid";
 
 export interface AgentResponse {
@@ -27,6 +28,17 @@ export interface ROMAResponse {
   };
 }
 
+function withCors(response: Response) {
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return response;
+}
+
+export async function OPTIONS() {
+  return withCors(new NextResponse(null, { status: 200 }));
+}
+
 const MODEL = "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
 
 async function callROMA(userGoal: string): Promise<ROMAResponse> {
@@ -35,7 +47,7 @@ async function callROMA(userGoal: string): Promise<ROMAResponse> {
   try {
     console.log("🚀 Starting ROMA project for:", userGoal);
 
-    const createRes = await fetch("http://localhost:5000/api/projects/configured", {
+    const createRes = await fetch("http://4.188.80.253:5000/api/projects/configured", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -71,7 +83,7 @@ async function callROMA(userGoal: string): Promise<ROMAResponse> {
 
     while (attempts < maxAttempts) {
       attempts++;
-      const res = await fetch(`http://localhost:5000/api/projects/${id}/load-results`);
+      const res = await fetch(`http://4.188.80.253:5000/api/projects/${id}/load-results`);
       if (!res.ok) {
         await new Promise((r) => setTimeout(r, 1000));
         continue;
@@ -153,7 +165,7 @@ function parseCryptoDetailAgentData(rawStreamData: string): string {
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.slice(6));
-          
+
           if (data.event_name === 'FULL_ANALYSIS' && data.content_type === 'atomic.json') {
             if (data.content && data.content.analysis) {
               analysisContent = data.content.analysis;
@@ -161,7 +173,7 @@ function parseCryptoDetailAgentData(rawStreamData: string): string {
               break;
             }
           }
-          
+
           if (data.content_type === 'chunked.text' && data.content) {
             analysisContent += data.content;
           }
@@ -199,13 +211,13 @@ function parseWebSearchData(rawStreamData: string): { content: string; sources: 
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.slice(6));
-          
+
           if (data.event_name === 'SOURCES' && data.content_type === 'atomic.json') {
             if (data.content && data.content.results) {
               sources = data.content.results.map((result: any) => result.url);
             }
           }
-          
+
           if (data.event_name === 'FINAL_RESPONSE' && data.content_type === 'chunked.text' && data.content) {
             finalResponse += data.content;
             inFinalResponse = true;
@@ -259,12 +271,12 @@ function parseFormatAgentData(rawStreamData: string): string {
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.slice(6));
-          
+
           if (data.event_name === 'TEMPLATE_STREAM' && data.content_type === 'chunked.text' && data.content) {
             templateContent += data.content;
             inTemplateStream = true;
           }
-          
+
           if (data.event_name === 'COMPLETE_TEMPLATE' && data.content_type === 'atomic.json') {
             if (data.content && data.content.template) {
               templateContent = data.content.template;
@@ -400,7 +412,7 @@ or {"agents":["format_agent"]}
 
         try {
           let safPrompt = userGoal;
-          
+
           if (agentName === "crypto_detail_agent") {
             safPrompt = contractAddresses[0] || "No contract address provided";
           }
@@ -472,7 +484,7 @@ or {"agents":["format_agent"]}
             sources: sources.length > 0 ? sources : undefined,
             rawData: rawStreamData.substring(0, 500) + '...',
             status: "success",
-            metadata: { 
+            metadata: {
               responseTime: Date.now() - startTime,
               sourceCount: sources.length
             },
@@ -586,7 +598,7 @@ ${contextData || "No specific context available."}
     const finalData = await finalResponse.json();
     const aiContent = finalData.choices?.[0]?.message?.content || "No AI response generated.";
 
-    return new Response(
+    const successResponse = new Response(
       JSON.stringify({
         message: aiContent,
         agents: activeAgents,
@@ -598,14 +610,20 @@ ${contextData || "No specific context available."}
       }),
       { headers: { "Content-Type": "application/json" } }
     );
+
+    return withCors(successResponse);
+
+
   } catch (error: any) {
     console.error("❌ Main POST error:", error);
-    return new Response(
+    const errorResponse = new Response(
       JSON.stringify({
         error: error.message,
         message: "An error occurred while processing your request.",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
+
+    return withCors(errorResponse);
   }
 }

@@ -66,7 +66,7 @@ export default function LoginPage() {
         <Card className="bg-card/40 border-0">
           <CardHeader className="text-center space-y-2 sm:space-y-3 pb-4 sm:pb-6 pt-6 sm:pt-8 px-4 sm:px-6">
             <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Welcome back
+              Welcome
             </CardTitle>
             <CardDescription className="text-sm sm:text-base text-muted-foreground">
               Sign in to continue your conversations
