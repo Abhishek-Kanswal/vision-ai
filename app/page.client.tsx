@@ -134,7 +134,8 @@ export default function ClientChatPage({ user }: PageProps) {
             <SidebarInset className="flex flex-col h-screen overflow-hidden">
                 <div className="flex items-center justify-center h-full w-full bg-[var(--secondary)]">
                     <div className="flex flex-col bg-background text-foreground w-[98%] h-[98%] rounded-2xl shadow-lg p-2 m-auto">
-                        <header className="flex-shrink-0 bg-background border-b border-border px-4 py-2 flex items-center gap-3 z-10">
+                        {/* Header */}
+                        <header className="flex-shrink-0 bg-background border-b border-border px-4 py-2 flex items-center gap-3 z-10 sticky top-0">
                             <SidebarTrigger className="h-8 w-8 p-0 hover:bg-accent" />
                             <div className="flex-1 flex items-center gap-2">
                                 <DropdownMenu>
@@ -153,24 +154,34 @@ export default function ClientChatPage({ user }: PageProps) {
                             </div>
                         </header>
 
-                        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background hide-scrollbar">
-                            <div className="max-w-4xl mx-auto px-6 py-4 h-full">
+                        {/* Message Area */}
+                        <main className="flex-1 min-h-0 overflow-hidden bg-background">
+                            <div className="h-full flex flex-col">
                                 {messages.length > 0 ? (
-                                    <MessageList messages={messages} isLoading={isLoading} />
+                                    <div className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar">
+                                        <div className="max-w-4xl mx-auto px-6 py-4">
+                                            <MessageList messages={messages} isLoading={isLoading} />
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <EmptyState
-                                        selectedAIModel={selectedAIModel}
-                                        send={send}
-                                        input={input}
-                                        setInput={setInput}
-                                        isLoading={isLoading}
-                                    />
+                                    <div className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar">
+                                        <div className="max-w-4xl mx-auto px-6 py-4 h-full">
+                                            <EmptyState
+                                                selectedAIModel={selectedAIModel}
+                                                send={send}
+                                                input={input}
+                                                setInput={setInput}
+                                                isLoading={isLoading}
+                                            />
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </main>
 
+                        {/* Footer */}
                         {messages.length > 0 && (
-                            <footer className="flex-shrink-0 bg-background border-t border-border px-4 py-3">
+                            <footer className="flex-shrink-0 bg-background border-t border-border px-4 py-3 sticky bottom-0">
                                 <div className="max-w-4xl mx-auto">
                                     <ChatInput
                                         value={input}
@@ -200,9 +211,15 @@ export default function ClientChatPage({ user }: PageProps) {
                     background: transparent !important;
                     -webkit-appearance: none !important;
                 }
+                
+                /* Prevent body scrolling on mobile */
+                @media (max-width: 768px) {
+                    body {
+                        overflow: hidden;
+                    }
+                }
             `}</style>
-
-        </SidebarProvider >
+        </SidebarProvider>
     )
 }
 
@@ -243,7 +260,7 @@ function EmptyState({ input, setInput, selectedAIModel, send, isLoading }: any) 
             </div>
 
             {/* Chat Input for Mobile */}
-            <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border md:hidden px-4 py-3 z-50">
+            <div className="w-full max-w-4xl md:hidden">
                 <ChatInput
                     value={input}
                     onChange={setInput}

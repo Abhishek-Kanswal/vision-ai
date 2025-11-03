@@ -348,9 +348,9 @@ print("Response:", response.text)`
     }
 
     return (
-        <div className="h-screen flex flex-col bg-background">
+        <div className="min-h-screen flex flex-col bg-background">
             {/* Header */}
-            <div className="border-b border-border">
+            <div className="border-b border-border shrink-0">
                 <div className="flex items-center">
                     <Link href="/" className="flex items-center justify-center h-10 w-10 text-foreground hover:bg-accent mx-2 rounded-lg transition-colors">
                         <Home size={20} />
@@ -360,7 +360,7 @@ print("Response:", response.text)`
                     <div className="flex">
                         <button
                             onClick={() => setActiveTab("playground")}
-                            className={`px-6 py-4 font-medium transition-colors ${activeTab === "playground"
+                            className={`px-4 sm:px-6 py-4 font-medium transition-colors ${activeTab === "playground"
                                 ? "border-b-2 border-blue-500 text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
                                 }`}
@@ -369,7 +369,7 @@ print("Response:", response.text)`
                         </button>
                         <button
                             onClick={() => setActiveTab("api-keys")}
-                            className={`px-6 py-4 font-medium transition-colors ${activeTab === "api-keys"
+                            className={`px-4 sm:px-6 py-4 font-medium transition-colors ${activeTab === "api-keys"
                                 ? "border-b-2 border-blue-500 text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
                                 }`}
@@ -386,14 +386,14 @@ print("Response:", response.text)`
                     <div className="flex-1 overflow-auto p-4 lg:p-8">
                         <div className="max-w-2xl mx-auto space-y-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-foreground mb-2">Manage API Keys</h2>
-                                <p className="text-muted-foreground">Create and manage your API keys for authentication</p>
+                                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Manage API Keys</h2>
+                                <p className="text-sm sm:text-base text-muted-foreground">Create and manage your API keys for authentication</p>
                             </div>
 
                             {!user ? (
-                                <div className="p-6 border border-border rounded-lg bg-card text-center">
-                                    <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                    <p className="text-muted-foreground mb-4">
+                                <div className="p-4 sm:p-6 border border-border rounded-lg bg-card text-center">
+                                    <Key className="h-10 sm:h-12 w-10 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                                    <p className="text-sm sm:text-base text-muted-foreground mb-4">
                                         Please sign in to manage your API keys
                                     </p>
                                     <Link
@@ -401,11 +401,10 @@ print("Response:", response.text)`
                                             pathname: "/auth/login",
                                             query: { redirectTo: "/docs/api" },
                                         }}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
                                     >
                                         Sign in to Continue
                                     </Link>
-                                    {/*  */}
                                 </div>
                             ) : (
                                 <>
@@ -417,13 +416,13 @@ print("Response:", response.text)`
                                                 value={newKeyName}
                                                 onChange={(e) => setNewKeyName(e.target.value)}
                                                 placeholder="Enter key name (e.g., Production, Development)"
-                                                className="flex-1 px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="flex-1 px-3 sm:px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                                                 onKeyPress={(e) => e.key === "Enter" && createApiKey()}
                                             />
                                             <button
                                                 onClick={createApiKey}
                                                 disabled={isCreatingKey || !newKeyName.trim()}
-                                                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed sm:w-auto w-full"
+                                                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed sm:w-auto w-full text-sm sm:text-base"
                                             >
                                                 {isCreatingKey ? (
                                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -439,19 +438,19 @@ print("Response:", response.text)`
                                         <label className="block text-sm font-semibold text-foreground">Your API Keys</label>
                                         <div className="space-y-2">
                                             {apiKeys.length === 0 ? (
-                                                <div className="p-6 border border-border rounded-lg text-center">
+                                                <div className="p-4 sm:p-6 border border-border rounded-lg text-center">
                                                     <Key className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                                                    <p className="text-muted-foreground">No API keys found. Create your first one above.</p>
+                                                    <p className="text-sm text-muted-foreground">No API keys found. Create your first one above.</p>
                                                 </div>
                                             ) : (
                                                 apiKeys.map((key) => (
                                                     <div
                                                         key={key.id}
-                                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-blue-500/50 transition-colors gap-3"
+                                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-card border border-border rounded-lg hover:border-blue-500/50 transition-colors gap-3"
                                                     >
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="font-medium text-foreground">{key.name}</p>
-                                                            <p className="text-sm text-muted-foreground font-mono truncate">{key.key}</p>
+                                                            <p className="font-medium text-foreground text-sm sm:text-base">{key.name}</p>
+                                                            <p className="text-xs sm:text-sm text-muted-foreground font-mono truncate">{key.key}</p>
                                                             <p className="text-xs text-muted-foreground mt-1">
                                                                 Created {new Date(key.createdAt).toLocaleDateString()}
                                                             </p>
@@ -491,48 +490,48 @@ print("Response:", response.text)`
                 {activeTab === "playground" && (
                     <>
                         {/* Input Panel */}
-                        <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto">
-                            <div className="p-4 lg:p-8 space-y-6">
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-foreground">Query</label>
-                                    <textarea
-                                        value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
-                                        placeholder="Enter your search query..."
-                                        className="w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none h-32"
-                                    />
-                                </div>
-
-                                <div className="space-y-3">
-                                    <label className="block text-sm font-semibold text-foreground">Deep Search</label>
-                                    <div className="flex gap-4">
-                                        <button
-                                            onClick={() => setDeepSearch(true)}
-                                            className={`flex-1 py-2 rounded-lg font-medium transition-colors ${deepSearch
-                                                ? "bg-blue-500 text-white"
-                                                : "bg-card border border-border text-muted-foreground hover:text-foreground"
-                                                }`}
-                                        >
-                                            True
-                                        </button>
-                                        <button
-                                            onClick={() => setDeepSearch(false)}
-                                            className={`flex-1 py-2 rounded-lg font-medium transition-colors ${!deepSearch
-                                                ? "bg-blue-500 text-white"
-                                                : "bg-card border border-border text-muted-foreground hover:text-foreground"
-                                                }`}
-                                        >
-                                            False
-                                        </button>
+                        <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-border flex flex-col">
+                            <div className="flex-1 overflow-y-auto">
+                                <div className="p-4 lg:p-6 xl:p-8 space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-semibold text-foreground">Query</label>
+                                        <textarea
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
+                                            placeholder="Enter your search query..."
+                                            className="w-full px-3 sm:px-4 py-3 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none h-32 text-sm sm:text-base"
+                                        />
                                     </div>
-                                </div>
 
-                                {/* Send Request Button */}
-                                <div className="lg:hidden">
+                                    <div className="space-y-3">
+                                        <label className="block text-sm font-semibold text-foreground">Deep Search</label>
+                                        <div className="flex gap-3 sm:gap-4">
+                                            <button
+                                                onClick={() => setDeepSearch(true)}
+                                                className={`flex-1 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${deepSearch
+                                                    ? "bg-blue-500 text-white"
+                                                    : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                                                    }`}
+                                            >
+                                                True
+                                            </button>
+                                            <button
+                                                onClick={() => setDeepSearch(false)}
+                                                className={`flex-1 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${!deepSearch
+                                                    ? "bg-blue-500 text-white"
+                                                    : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                                                    }`}
+                                            >
+                                                False
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Send Request Button */}
                                     <Button
                                         onClick={handleSendRequest}
                                         disabled={isLoading || !query.trim() || !API_KEY}
-                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                                     >
                                         {isLoading ? (
                                             <div className="flex items-center gap-2">
@@ -548,8 +547,8 @@ print("Response:", response.text)`
                         </div>
 
                         {/* Code Panel */}
-                        <div className="w-full lg:w-1/2 flex flex-col bg-card overflow-hidden">
-                            <div className="border-b border-border px-4 lg:px-6 py-4 space-y-4">
+                        <div className="w-full lg:w-1/2 flex flex-col bg-card overflow-hidden" style={{ maxHeight: '50vh' }}>
+                            <div className="border-b border-border px-4 lg:px-6 py-4 space-y-4 shrink-0">
                                 <h2 className="text-lg font-semibold text-foreground">Code Examples</h2>
                                 <div className="flex gap-1 overflow-x-auto">
                                     {codeTabs.map((tab) => (
@@ -569,7 +568,7 @@ print("Response:", response.text)`
                             </div>
 
                             <div className="flex-1 overflow-auto">
-                                <div className="p-4 lg:p-6 space-y-6">
+                                <div className="p-4 lg:p-6 space-y-4">
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-muted-foreground">Code</span>
@@ -594,7 +593,7 @@ print("Response:", response.text)`
                                                     borderRadius: '0.5rem',
                                                     fontSize: '0.75rem',
                                                     lineHeight: '1.4',
-                                                    maxHeight: '300px'
+                                                    maxHeight: '200px'
                                                 }}
                                                 showLineNumbers
                                             >
@@ -603,7 +602,7 @@ print("Response:", response.text)`
                                         </div>
                                     </div>
 
-                                    <div className="border-t border-border pt-6 space-y-3">
+                                    <div className="border-t border-border pt-4 space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-muted-foreground">Response</span>
                                             {apiResponse && (
@@ -629,31 +628,13 @@ print("Response:", response.text)`
                                                     borderRadius: '0.5rem',
                                                     fontSize: '0.75rem',
                                                     lineHeight: '1.4',
-                                                    maxHeight: '300px'
+                                                    maxHeight: '200px'
                                                 }}
                                                 showLineNumbers
                                             >
                                                 {apiResponse ? JSON.stringify(apiResponse, null, 2) : isLoading ? "// Waiting for response..." : "// Send a request to see the response here..."}
                                             </SyntaxHighlighter>
                                         </div>
-                                    </div>
-
-                                    {/* Send Request Button - Hidden on mobile, shown on desktop in code panel */}
-                                    <div className="hidden lg:block">
-                                        <Button
-                                            onClick={handleSendRequest}
-                                            disabled={isLoading || !query.trim() || !API_KEY}
-                                            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {isLoading ? (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                    Sending...
-                                                </div>
-                                            ) : (
-                                                "Send Request"
-                                            )}
-                                        </Button>
                                     </div>
                                 </div>
                             </div>
