@@ -7,7 +7,7 @@ import { useChatLite } from "@/hooks/use-chat-lite"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import ChatSidebar from "@/components/chat/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Check, ChevronDown, X, ExternalLink, Zap, Bitcoin, ShieldCheck } from "lucide-react"
+import { ChevronDown, Zap, Bitcoin, ShieldCheck } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
 import ShinyText from "@/components/ui/ShinyText"
 
@@ -131,12 +131,15 @@ export default function ClientChatPage({ user }: PageProps) {
                 renamingIds={renamingConversations}
                 variant="inset"
             />
+
             <SidebarInset className="flex flex-col h-screen overflow-hidden">
                 <div className="flex items-center justify-center h-full w-full bg-[var(--secondary)]">
                     <div className="flex flex-col bg-background text-foreground w-[98%] h-[98%] rounded-2xl shadow-lg p-2 m-auto">
+
                         {/* Header */}
                         <header className="flex-shrink-0 bg-background border-b border-border px-4 py-2 flex items-center gap-3 z-10 sticky top-0">
                             <SidebarTrigger className="h-8 w-8 p-0 hover:bg-accent" />
+
                             <div className="flex-1 flex items-center gap-2">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -146,6 +149,7 @@ export default function ClientChatPage({ user }: PageProps) {
                                         </button>
                                     </DropdownMenuTrigger>
                                 </DropdownMenu>
+
                                 {dbLoading && (
                                     <div className="ml-2">
                                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-foreground"></div>
@@ -199,6 +203,7 @@ export default function ClientChatPage({ user }: PageProps) {
                 </div>
             </SidebarInset>
 
+            {/* FIXED GLOBAL STYLES */}
             <style jsx global>{`
                 .hide-scrollbar {
                     -ms-overflow-style: none !important;
@@ -206,16 +211,13 @@ export default function ClientChatPage({ user }: PageProps) {
                 }
                 .hide-scrollbar::-webkit-scrollbar {
                     display: none !important;
-                    width: 0 !important;
-                    height: 0 !important;
-                    background: transparent !important;
-                    -webkit-appearance: none !important;
                 }
-                
-                /* Prevent body scrolling on mobile */
+
+                /* FIX: allow vertical scroll on mobile */
                 @media (max-width: 768px) {
-                    body {
-                        overflow: hidden;
+                    html, body {
+                        overflow-x: hidden !important;
+                        overscroll-behavior-y: none;
                     }
                 }
             `}</style>
@@ -246,21 +248,8 @@ function EmptyState({ input, setInput, selectedAIModel, send, isLoading }: any) 
                 <ShinyText text="Genius" disabled={false} speed={3} className="custom-class" />?
             </div>
 
-            {/* Chat Input for Desktop */}
-            <div className="w-full max-w-4xl hidden md:block">
-                <ChatInput
-                    value={input}
-                    onChange={setInput}
-                    onSend={send}
-                    disabled={isLoading}
-                    isLoading={isLoading}
-                    messages={[]}
-                    selectedModel={selectedAIModel}
-                />
-            </div>
-
-            {/* Chat Input for Mobile */}
-            <div className="w-full max-w-4xl md:hidden">
+            {/* Single (unified) ChatInput */}
+            <div className="w-full max-w-4xl">
                 <ChatInput
                     value={input}
                     onChange={setInput}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Copy, Plus, Trash2, Home, Check, Key } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -34,6 +34,8 @@ export default function ApiPlayground({ user }: ApiPlaygroundProps) {
     const [apiResponse, setApiResponse] = useState<any>(null)
     const [isCreatingKey, setIsCreatingKey] = useState(false)
     const [copiedItem, setCopiedItem] = useState<string | null>(null)
+    
+    const responseRef = useRef<HTMLDivElement>(null)
 
     const router = useRouter()
     const API_KEY = process.env.NEXT_PUBLIC_VISIONAI_API_KEY
@@ -264,6 +266,13 @@ print("Response:", response.text)`
             }
 
             setApiResponse(data)
+            
+            // Scroll to response on mobile
+            if (window.innerWidth < 1024 && responseRef.current) {
+                setTimeout(() => {
+                    responseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 100)
+            }
 
         } catch (error) {
             console.error('API Error:', error)
@@ -271,6 +280,13 @@ print("Response:", response.text)`
                 error: "Failed to fetch response",
                 details: error instanceof Error ? error.message : "Unknown error"
             })
+            
+            // Scroll to response on mobile even for errors
+            if (window.innerWidth < 1024 && responseRef.current) {
+                setTimeout(() => {
+                    responseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 100)
+            }
         } finally {
             setIsLoading(false)
         }
@@ -547,7 +563,7 @@ print("Response:", response.text)`
                         </div>
 
                         {/* Code Panel */}
-                        <div className="w-full lg:w-1/2 flex flex-col bg-card overflow-hidden" style={{ maxHeight: '50vh' }}>
+                        <div className="w-full lg:w-1/2 flex flex-col bg-card">
                             <div className="border-b border-border px-4 lg:px-6 py-4 space-y-4 shrink-0">
                                 <h2 className="text-lg font-semibold text-foreground">Code Examples</h2>
                                 <div className="flex gap-1 overflow-x-auto">
@@ -567,7 +583,7 @@ print("Response:", response.text)`
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-auto">
+                            <div className="flex-1 overflow-y-auto">
                                 <div className="p-4 lg:p-6 space-y-4">
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
@@ -592,8 +608,7 @@ print("Response:", response.text)`
                                                     margin: 0,
                                                     borderRadius: '0.5rem',
                                                     fontSize: '0.75rem',
-                                                    lineHeight: '1.4',
-                                                    maxHeight: '200px'
+                                                    lineHeight: '1.4'
                                                 }}
                                                 showLineNumbers
                                             >
@@ -602,7 +617,7 @@ print("Response:", response.text)`
                                         </div>
                                     </div>
 
-                                    <div className="border-t border-border pt-4 space-y-3">
+                                    <div ref={responseRef} className="border-t border-border pt-4 space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-muted-foreground">Response</span>
                                             {apiResponse && (
@@ -627,8 +642,7 @@ print("Response:", response.text)`
                                                     margin: 0,
                                                     borderRadius: '0.5rem',
                                                     fontSize: '0.75rem',
-                                                    lineHeight: '1.4',
-                                                    maxHeight: '200px'
+                                                    lineHeight: '1.4'
                                                 }}
                                                 showLineNumbers
                                             >
