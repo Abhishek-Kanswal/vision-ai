@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = "https://api.fireworks.ai/inference/v1/completions";
-const MODEL = "accounts/sentientfoundation/models/dobby-unhinged-llama-3-3-70b-new";
+const MODEL = "accounts/fireworks/models/mixtral-8x22b-instruct";
 
 export async function POST(req: NextRequest) {
   try {

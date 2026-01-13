@@ -267,7 +267,6 @@ print("Response:", response.text)`
 
             setApiResponse(data)
             
-            // Scroll to response on mobile
             if (window.innerWidth < 1024 && responseRef.current) {
                 setTimeout(() => {
                     responseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -281,7 +280,6 @@ print("Response:", response.text)`
                 details: error instanceof Error ? error.message : "Unknown error"
             })
             
-            // Scroll to response on mobile even for errors
             if (window.innerWidth < 1024 && responseRef.current) {
                 setTimeout(() => {
                     responseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
